@@ -124,6 +124,16 @@ static apr_status_t rpaf_cleanup(void *data) {
     return APR_SUCCESS;
 }
 
+static char* last_not_in_array(apr_array_header_t *forwarded_for,
+                               apr_array_header_t *proxy_ips) {
+    int i;
+    for (i = (forwarded_for->nelts)-1; i > 0; i--) {
+	if (!is_in_array(((char **)forwarded_for->elts)[i], proxy_ips))
+           break;
+    }
+    return ((char **)forwarded_for->elts)[i];
+}
+
 static int change_remote_ip(request_rec *r) {
     const char *fwdvalue;
     char *val;
@@ -155,7 +165,7 @@ static int change_remote_ip(request_rec *r) {
             rcr->old_ip = apr_pstrdup(r->connection->pool, r->connection->remote_ip);
             rcr->r = r;
             apr_pool_cleanup_register(r->pool, (void *)rcr, rpaf_cleanup, apr_pool_cleanup_null);
-            r->connection->remote_ip = apr_pstrdup(r->connection->pool, ((char **)arr->elts)[((arr->nelts)-1)]);
+            r->connection->remote_ip = apr_pstrdup(r->connection->pool, last_not_in_array(arr, cfg->proxy_ips));
             r->connection->remote_addr->sa.sin.sin_addr.s_addr = apr_inet_addr(r->connection->remote_ip);
 
             if (cfg->sethostname) {
