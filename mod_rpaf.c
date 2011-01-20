@@ -72,6 +72,8 @@
 #include "http_vhost.h"
 #include "apr_strings.h"
 
+#include <arpa/inet.h>
+
 module AP_MODULE_DECLARE_DATA rpaf_module;
 
 typedef struct {
@@ -186,7 +188,7 @@ static int change_remote_ip(request_rec *r) {
            that instead of X-Forwarded-For by default */
         if (cfg->headername && (fwdvalue = apr_table_get(r->headers_in, cfg->headername))) {
             //
-        } else if (fwdvalue = apr_table_get(r->headers_in, "X-Forwarded-For")) {
+        } else if ((fwdvalue = apr_table_get(r->headers_in, "X-Forwarded-For"))) {
             //
         } else {
             return DECLINED;
@@ -260,7 +262,7 @@ static const command_rec rpaf_cmds[] = {
                  ),
     AP_INIT_FLAG(
                  "RPAF_SetPort",
-                 rpaf_sethttps,
+                 rpaf_setport,
                  NULL,
                  RSRC_CONF,
                  "Let mod_rpaf set the server port from the X-Port header"
