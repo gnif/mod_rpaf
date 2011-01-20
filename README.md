@@ -46,7 +46,7 @@ Sets `REMOTE_ADDR`, `HTTPS`, and `HTTP_PORT` to the values provided by an upstre
 ## Authors
 
 * Thomas Eibner <thomas@stderr.net>
-* Geoffrey McRae <geoff@xbmc.org>
+* Geoffrey McRae <gnif@xbmc.org>
 
 ## License and distribution
 

@@ -102,7 +102,6 @@ debian/po/POTFILES.in: $(shell which yada) debian/packages-tmp
 
 debian/build-stamp: debian/build-arch-stamp debian/build-indep-stamp
 	@[ -f $(shell which yada) -a -f debian/rules ]
-	yada patch "debian/patches/*.patch"
 	@umask 022 \
 	  && export pwd="$$(pwd)" \
 	  && export TMPROOT="$$(pwd)/debian/tmp" \
@@ -128,18 +127,17 @@ debian/build-stamp: debian/build-arch-stamp debian/build-indep-stamp
 	echo -E 'fi';\
 	echo -E 'mkdir apache2-build';\
 	echo -E 'pushd apache2-build';\
+	echo -E '    cp ../mod_rpaf.c ./';\
 	echo -E '    $$APXS2 -c -S CFLAGS="`$$APXS2 -q CFLAGS` `apr-1-config --cppflags` $$CFLAGS" mod_rpaf.c';\
 	echo -E 'popd') | /bin/bash
 	touch debian/build-stamp
 
 debian/build-arch-stamp:
 	@[ -f $(shell which yada) -a -f debian/rules ]
-	yada patch "debian/patches/*.patch"
 	touch debian/build-arch-stamp
 
 debian/build-indep-stamp: debian/build-arch-stamp
 	@[ -f $(shell which yada) -a -f debian/rules ]
-	yada patch "debian/patches/*.patch"
 	touch debian/build-indep-stamp
 
 .PHONY: install-tree
