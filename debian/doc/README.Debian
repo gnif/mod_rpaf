@@ -1,0 +1,23 @@
+libapache-mod-rpaf for Debian
+-----------------------------
+
+  Configuration:
+  
+    Module configuration is pretty simple, there are only a few directives to
+    set where you can define which IP's are your frontend proxies that sends
+    the correct X-Forwarded-For headers. If you do not use the RPAF_ProxyIPs
+    directive then the module will not change the remote address of the
+    incoming connection at any time.
+
+    This module can cope with SSL proxied requests by setting the HTTPS
+    environment variable and the server port passed from the proxy via
+    X-Forwarded-HTTPS and X-Forwarded-Port respectively,
+  
+    RPAF_Enable On
+    RPAF_ProxyIPs 127.0.0.1 10.0.0.1
+    RPAF_Header X-Forwarded-For
+    RPAF_SetHostName On
+    RPAF_SetHTTPS On
+    RPAF_SetPort On
+  
+ -- Geoffrey McRae <gnif@xbmc.org>  Thu, 20 Jan 2010 17:59:04 +1000

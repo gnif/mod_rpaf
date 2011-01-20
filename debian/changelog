@@ -1,0 +1,96 @@
+libapache2-mod-rpaf (0.7-0.1) unstable; urgency=low
+
+  * Fixed warnings and errors
+  * Added X-HTTPS and X-Port support
+
+ -- Geoffrey McRae <gnif@xbmc.org>  Thu, 20 Jan 2011 17:51:32 +1000
+
+libapache2-mod-rpaf (0.6-0.2) unstable; urgency=low
+
+  * Non-maintainer upload.
+  * fix version number in last changelog
+  * Bump Standards-Version to 3.8.4
+  * change section from web to httpd
+
+ -- Ivan Borzenkov <ivan1986@list.ru>  Wed, 19 May 2010 15:44:59 +0400
+
+libapache2-mod-rpaf (0.6-0.1) UNRELEASE; urgency=low
+
+  * Non-maintainer upload for new upstream release. Closes: #468460.
+    Added the ability to change which header Apache looks at.
+  * Removed debian/patches/020_keepalive.patch and debian/patches/030_ipv6.patch
+    as it probably fixed in upstream.
+  * Updated 040_multiple_hostnames.patch to patch right source file.
+    Support for multiple hostnames in X-Forwarded-Host header in apache2 version.
+
+ -- Pavel V. Rochnyack <rpv@nikolas.ru>  Mon, 02 Nov 2009 13:15:17 +0600
+
+libapache2-mod-rpaf (0.5-3) unstable; urgency=low
+
+  * Rename source package name from libapache-mod-rpaf to libapache2-mod-rpaf.
+  * Dropped Apache 1.3 support. Closes: #429131.
+  * Resolved problem with keepalive requests. Closes: #345648.
+  * Support for IPv6-enabled webservers. Closes: #409521, #414450.
+  * Support for multiple hostnames in X-Forwarded-Host header. Closes: #416387.
+  * Get last address in the header which is not in RPAFproxy_ips. Closes: #377190.
+
+ -- Piotr Roszatycki <dexter@debian.org>  Tue, 30 Oct 2007 13:38:58 +0100
+
+libapache-mod-rpaf (0.5-2.1) unstable; urgency=low
+
+  * Non-maintainer upload to update dependency on an uninstallable package.
+  * Updated the dependency of libapache2-mod-suphp to apache2.2-common.
+    (Closes: #391753)
+  * Added a call to apr-1-config --cppflags to get the correct CFLAGS at 
+    build time.
+
+ -- Margarita Manterola <marga@debian.org>  Wed, 18 Oct 2006 14:20:31 -0300
+
+libapache-mod-rpaf (0.5-2) unstable; urgency=low
+
+  * Add rpaf.conf with base configuration.
+
+ -- Piotr Roszatycki <dexter@debian.org>  Wed, 16 Mar 2005 11:08:47 +0100
+
+libapache-mod-rpaf (0.5-1) unstable; urgency=low
+
+  * New upstream release.
+  * New libapache2-mod-rpaf binary package.
+  * This version fixes bug with incorrect log entries. Closes: #262050.
+  * Fixed typo in package description. Closes: #268519, #277225.
+
+ -- Piotr Roszatycki <dexter@debian.org>  Mon, 28 Feb 2005 11:02:21 +0100
+
+libapache-mod-rpaf (0.4-1) unstable; urgency=low
+
+  * New upstream release.
+  * Fixed Origin field in debian/control, closes: #154412
+
+ -- Piotr Roszatycki <dexter@debian.org>  Tue, 19 Aug 2003 17:35:38 +0200
+
+libapache-mod-rpaf (0.3-2) unstable; urgency=low
+
+  * Safe postinst script.
+  * Fixes minor spelling error, closes: #124888
+
+ -- Piotr Roszatycki <dexter@debian.org>  Thu, 11 Apr 2002 11:37:47 +0200
+
+libapache-mod-rpaf (0.3-1) unstable; urgency=high
+
+  * New upstream release
+  * Fixes bug with memory leaking
+
+ -- Piotr Roszatycki <dexter@debian.org>  Fri,  5 Oct 2001 07:20:39 +0000
+
+libapache-mod-rpaf (0.2-1) unstable; urgency=low
+
+  * New upstream release
+
+ -- Piotr Roszatycki <dexter@debian.org>  Tue,  2 Oct 2001 13:35:37 +0000
+
+libapache-mod-rpaf (0.1-1) unstable; urgency=low
+
+  * Initial Debian version.
+
+ -- Piotr Roszatycki <dexter@debian.org>  Thu, 30 Aug 2001 16:49:42 +0200
+
