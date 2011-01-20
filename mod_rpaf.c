@@ -172,8 +172,15 @@ static int change_remote_ip(request_rec *r) {
                 const char *hostvalue;
                 if ((hostvalue = apr_table_get(r->headers_in, "X-Forwarded-Host")) ||
                     (hostvalue = apr_table_get(r->headers_in, "X-Host"))) {
-                    apr_table_set(r->headers_in, "Host", apr_pstrdup(r->pool, hostvalue));
-                    r->hostname = apr_pstrdup(r->pool, hostvalue);
+                    apr_array_header_t *arr = apr_array_make(r->pool, 0, sizeof(char*));
+                    while (*hostvalue && (val = ap_get_token(r->pool, &hostvalue, 1))) {
+                        *(char **)apr_array_push(arr) = apr_pstrdup(r->pool, val);
+                        if (*hostvalue != '\0')
+                          ++hostvalue;
+                    }
+
+                    apr_table_set(r->headers_in, "Host", apr_pstrdup(r->pool, ((char **)arr->elts)[((arr->nelts)-1)]));
+                    r->hostname = apr_pstrdup(r->pool, ((char **)arr->elts)[((arr->nelts)-1)]);
                     ap_update_vhost_from_headers(r);
                 }
             }
