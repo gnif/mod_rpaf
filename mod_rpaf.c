@@ -52,7 +52,7 @@
  */
 
 /*
- * $Id: mod_rpaf.c 17 2008-01-01 03:03:15Z thomas $
+ * $Id: mod_rpaf-2.0.c 18 2008-01-01 03:05:40Z thomas $
  *
  * Author: Thomas Eibner, <thomas@stderr.net>
  * URL: http://stderr.net/apache/rpaf/
@@ -70,14 +70,15 @@
 #include "http_log.h"
 #include "http_protocol.h"
 #include "http_vhost.h"
+#include "apr_strings.h"
 
-module MODULE_VAR_EXPORT rpaf_module;
+module AP_MODULE_DECLARE_DATA rpaf_module;
 
 typedef struct {
-    int          enable;
-    int          sethostname;
-    const char   *headername;
-    array_header *proxy_ips;
+    int                enable;
+    int                sethostname;
+    const char         *headername;
+    apr_array_header_t *proxy_ips;
 } rpaf_server_cfg;
 
 typedef struct {
@@ -85,30 +86,29 @@ typedef struct {
     request_rec *r;
 } rpaf_cleanup_rec;
 
-static void *rpaf_create_server_cfg(pool *p, server_rec *s) {
-    rpaf_server_cfg *cfg = (rpaf_server_cfg *)ap_pcalloc(p, sizeof(rpaf_server_cfg));
+static void *rpaf_create_server_cfg(apr_pool_t *p, server_rec *s) {
+    rpaf_server_cfg *cfg = (rpaf_server_cfg *)apr_pcalloc(p, sizeof(rpaf_server_cfg));
     if (!cfg)
         return NULL;
 
-    cfg->proxy_ips = ap_make_array(p, 0, sizeof(char *));
+    cfg->proxy_ips = apr_array_make(p, 0, sizeof(char *));
     cfg->enable = 0;
     cfg->sethostname = 0;
 
     return (void *)cfg;
 }
 
-static const char *rpaf_set_proxy_ip(cmd_parms *cmd, void *dummy, char *proxy_ip) {
+static const char *rpaf_set_proxy_ip(cmd_parms *cmd, void *dummy, const char *proxy_ip) {
     server_rec *s = cmd->server;
     rpaf_server_cfg *cfg = (rpaf_server_cfg *)ap_get_module_config(s->module_config, 
                                                                    &rpaf_module);
 
     /* check for valid syntax of ip */
-
-    *(char **)ap_push_array(cfg->proxy_ips) = ap_pstrdup(cmd->pool, proxy_ip);
+    *(char **)apr_array_push(cfg->proxy_ips) = apr_pstrdup(cmd->pool, proxy_ip);
     return NULL;
 }
 
-static const char *rpaf_set_headername(cmd_parms *cmd, void *dummy, char *headername) {
+static const char *rpaf_set_headername(cmd_parms *cmd, void *dummy, const char *headername) {
     server_rec *s = cmd->server;
     rpaf_server_cfg *cfg = (rpaf_server_cfg *)ap_get_module_config(s->module_config, 
                                                                    &rpaf_module);
@@ -118,7 +118,7 @@ static const char *rpaf_set_headername(cmd_parms *cmd, void *dummy, char *header
 }
 
 static const char *rpaf_enable(cmd_parms *cmd, void *dummy, int flag) {
-   server_rec *s = cmd->server;
+    server_rec *s = cmd->server;
     rpaf_server_cfg *cfg = (rpaf_server_cfg *)ap_get_module_config(s->module_config, 
                                                                    &rpaf_module);
 
@@ -135,7 +135,7 @@ static const char *rpaf_sethostname(cmd_parms *cmd, void *dummy, int flag) {
     return NULL;
 }
 
-static int is_in_array(const char *remote_ip, array_header *proxy_ips) {
+static int is_in_array(const char *remote_ip, apr_array_header_t *proxy_ips) {
     int i;
     char **list = (char**)proxy_ips->elts;
     for (i = 0; i < proxy_ips->nelts; i++) {
@@ -145,10 +145,11 @@ static int is_in_array(const char *remote_ip, array_header *proxy_ips) {
     return 0;
 }
 
-static void rpaf_cleanup(void *data) {
+static apr_status_t rpaf_cleanup(void *data) {
     rpaf_cleanup_rec *rcr = (rpaf_cleanup_rec *)data;
-    rcr->r->connection->remote_ip   = ap_pstrdup(rcr->r->connection->pool, rcr->old_ip);
-    rcr->r->connection->remote_addr.sin_addr.s_addr = inet_addr(rcr->r->connection->remote_ip);
+    rcr->r->connection->remote_ip   = apr_pstrdup(rcr->r->connection->pool, rcr->old_ip);
+    rcr->r->connection->remote_addr->sa.sin.sin_addr.s_addr = apr_inet_addr(rcr->r->connection->remote_ip);
+    return APR_SUCCESS;
 }
 
 static int change_remote_ip(request_rec *r) {
@@ -161,80 +162,91 @@ static int change_remote_ip(request_rec *r) {
         return DECLINED;
 
     if (is_in_array(r->connection->remote_ip, cfg->proxy_ips) == 1) {
-        /* check if cfg->headername is set and if it is use 
+        /* check if cfg->headername is set and if it is use
            that instead of X-Forwarded-For by default */
-        if (cfg->headername && (fwdvalue = ap_table_get(r->headers_in, cfg->headername))) {
+        if (cfg->headername && (fwdvalue = apr_table_get(r->headers_in, cfg->headername))) {
             //
-        } else if (fwdvalue = ap_table_get(r->headers_in, "X-Forwarded-For")) {
+        } else if (fwdvalue = apr_table_get(r->headers_in, "X-Forwarded-For")) {
             //
-        } else { 
+        } else {
             return DECLINED;
         }
 
         if (fwdvalue) {
-            rpaf_cleanup_rec *rcr = (rpaf_cleanup_rec *)ap_pcalloc(r->pool, sizeof(rpaf_cleanup_rec));
-            array_header *arr = ap_make_array(r->pool, 0, sizeof(char*));
+            rpaf_cleanup_rec *rcr = (rpaf_cleanup_rec *)apr_pcalloc(r->pool, sizeof(rpaf_cleanup_rec));
+            apr_array_header_t *arr = apr_array_make(r->pool, 0, sizeof(char*));
             while (*fwdvalue && (val = ap_get_token(r->pool, &fwdvalue, 1))) {
-                *(char **)ap_push_array(arr) = ap_pstrdup(r->pool, val);
+                *(char **)apr_array_push(arr) = apr_pstrdup(r->pool, val);
                 if (*fwdvalue != '\0')
                     ++fwdvalue;
             }
-            rcr->old_ip = ap_pstrdup(r->connection->pool, r->connection->remote_ip);
+            rcr->old_ip = apr_pstrdup(r->connection->pool, r->connection->remote_ip);
             rcr->r = r;
-            ap_register_cleanup(r->pool, (void *)rcr, rpaf_cleanup, ap_null_cleanup);
-            r->connection->remote_ip = ap_pstrdup(r->connection->pool, ((char **)arr->elts)[((arr->nelts)-1)]);
-            r->connection->remote_addr.sin_addr.s_addr = inet_addr(r->connection->remote_ip);
+            apr_pool_cleanup_register(r->pool, (void *)rcr, rpaf_cleanup, apr_pool_cleanup_null);
+            r->connection->remote_ip = apr_pstrdup(r->connection->pool, ((char **)arr->elts)[((arr->nelts)-1)]);
+            r->connection->remote_addr->sa.sin.sin_addr.s_addr = apr_inet_addr(r->connection->remote_ip);
             if (cfg->sethostname) {
                 const char *hostvalue;
-                if (hostvalue = ap_table_get(r->headers_in, "X-Forwarded-Host")) {
+                if (hostvalue = apr_table_get(r->headers_in, "X-Forwarded-Host")) {
                     /* 2.0 proxy frontend or 1.3 => 1.3.25 proxy frontend */
-                    ap_table_set(r->headers_in, "Host", ap_pstrdup(r->pool, hostvalue));
-                    r->hostname = ap_pstrdup(r->pool, hostvalue);
+                    apr_table_set(r->headers_in, "Host", apr_pstrdup(r->pool, hostvalue));
+                    r->hostname = apr_pstrdup(r->pool, hostvalue);
                     ap_update_vhost_from_headers(r);
-                } else if (hostvalue = ap_table_get(r->headers_in, "X-Host")) {
+                } else if (hostvalue = apr_table_get(r->headers_in, "X-Host")) {
                     /* 1.3 proxy frontend with mod_proxy_add_forward */
-                    ap_table_set(r->headers_in, "Host", ap_pstrdup(r->pool, hostvalue));
-                    r->hostname = ap_pstrdup(r->pool, hostvalue);
+                    apr_table_set(r->headers_in, "Host", apr_pstrdup(r->pool, hostvalue));
+                    r->hostname = apr_pstrdup(r->pool, hostvalue);
                     ap_update_vhost_from_headers(r);
                 }
             }
+
         }
     }
     return DECLINED;
 }
 
-static command_rec rpaf_cmds[] = {
-    { "RPAFenable", rpaf_enable, NULL,
-      RSRC_CONF, FLAG, "Enable mod_rpaf" },
-    { "RPAFsethostname", rpaf_sethostname, NULL,
-      RSRC_CONF, FLAG, "Let mod_rpaf set the hostname from the X-Host header and update vhosts" },
-    { "RPAFproxy_ips", rpaf_set_proxy_ip, NULL,
-      RSRC_CONF, ITERATE, "IP(s) of Proxy server setting X-Forwarded-For header" },
-    { "RPAFheader", rpaf_set_headername, NULL,
-      RSRC_CONF, TAKE1, "Which header to look for when trying to find the real ip of the client in a proxy setup" },
+static const command_rec rpaf_cmds[] = {
+    AP_INIT_FLAG(
+                 "RPAFenable",
+                 rpaf_enable,
+                 NULL,
+                 RSRC_CONF,
+                 "Enable mod_rpaf"
+                 ),
+    AP_INIT_FLAG(
+                 "RPAFsethostname",
+                 rpaf_sethostname,
+                 NULL,
+                 RSRC_CONF,
+                 "Let mod_rpaf set the hostname from X-Host header and update vhosts"
+                 ),
+    AP_INIT_ITERATE(
+                    "RPAFproxy_ips",
+                    rpaf_set_proxy_ip,
+                    NULL,
+                    RSRC_CONF,
+                    "IP(s) of Proxy server setting X-Forwarded-For header"
+                    ),
+    AP_INIT_TAKE1(
+                    "RPAFheader",
+                    rpaf_set_headername,
+                    NULL,
+                    RSRC_CONF,
+                    "Which header to look for when trying to find the real ip of the client in a proxy setup"
+                    ),
     { NULL }
 };
 
-module MODULE_VAR_EXPORT rpaf_module = {
-    STANDARD_MODULE_STUFF,
-    NULL,                              /* initializer */
-    NULL,                              /* dir config creator */
-    NULL,                              /* dir config merger */
-    rpaf_create_server_cfg,            /* server config */
-    NULL,                              /* merge server config */
-    rpaf_cmds,                         /* command table */
-    NULL,                              /* handlers */
-    NULL,                              /* filename translation */
-    NULL,                              /* check_user_id */
-    NULL,                              /* check auth */
-    NULL,                              /* check access */
-    NULL,                              /* type_checker */
-    NULL,                              /* fixups */
-    NULL,                              /* logger */
-    NULL,                              /* header parser */
-    NULL,                              /* child_init */
-    NULL,                              /* child_exit */
-    change_remote_ip                   /* post read-request */
-};
+static void register_hooks(apr_pool_t *p) {
+    ap_hook_post_read_request(change_remote_ip, NULL, NULL, APR_HOOK_FIRST);
+}
 
-  
+module AP_MODULE_DECLARE_DATA rpaf_module = {
+    STANDARD20_MODULE_STUFF,
+    NULL,
+    NULL,
+    rpaf_create_server_cfg,
+    NULL,
+    rpaf_cmds,
+    register_hooks,
+};
