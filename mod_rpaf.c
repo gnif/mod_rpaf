@@ -77,6 +77,8 @@ module AP_MODULE_DECLARE_DATA rpaf_module;
 typedef struct {
     int                enable;
     int                sethostname;
+    int                sethttps;
+    int                setport;
     const char         *headername;
     apr_array_header_t *proxy_ips;
 } rpaf_server_cfg;
@@ -135,6 +137,24 @@ static const char *rpaf_sethostname(cmd_parms *cmd, void *dummy, int flag) {
     return NULL;
 }
 
+static const char *rpaf_sethttps(cmd_parms *cmd, void *dummy, int flag) {
+    server_rec *s = cmd->server;
+    rpaf_server_cfg *cfg = (rpaf_server_cfg *)ap_get_module_config(s->module_config, 
+                                                                   &rpaf_module);
+
+    cfg->sethttps = flag;
+    return NULL;
+}
+
+static const char *rpaf_setport(cmd_parms *cmd, void *dummy, int flag) {
+    server_rec *s = cmd->server;
+    rpaf_server_cfg *cfg = (rpaf_server_cfg *)ap_get_module_config(s->module_config, 
+                                                                   &rpaf_module);
+
+    cfg->setport = flag;
+    return NULL;
+}
+
 static int is_in_array(const char *remote_ip, apr_array_header_t *proxy_ips) {
     int i;
     char **list = (char**)proxy_ips->elts;
@@ -185,21 +205,32 @@ static int change_remote_ip(request_rec *r) {
             apr_pool_cleanup_register(r->pool, (void *)rcr, rpaf_cleanup, apr_pool_cleanup_null);
             r->connection->remote_ip = apr_pstrdup(r->connection->pool, ((char **)arr->elts)[((arr->nelts)-1)]);
             r->connection->remote_addr->sa.sin.sin_addr.s_addr = apr_inet_addr(r->connection->remote_ip);
+
             if (cfg->sethostname) {
                 const char *hostvalue;
-                if (hostvalue = apr_table_get(r->headers_in, "X-Forwarded-Host")) {
-                    /* 2.0 proxy frontend or 1.3 => 1.3.25 proxy frontend */
-                    apr_table_set(r->headers_in, "Host", apr_pstrdup(r->pool, hostvalue));
-                    r->hostname = apr_pstrdup(r->pool, hostvalue);
-                    ap_update_vhost_from_headers(r);
-                } else if (hostvalue = apr_table_get(r->headers_in, "X-Host")) {
-                    /* 1.3 proxy frontend with mod_proxy_add_forward */
+                if ((hostvalue = apr_table_get(r->headers_in, "X-Forwarded-Host")) ||
+                    (hostvalue = apr_table_get(r->headers_in, "X-Host"))) {
                     apr_table_set(r->headers_in, "Host", apr_pstrdup(r->pool, hostvalue));
                     r->hostname = apr_pstrdup(r->pool, hostvalue);
                     ap_update_vhost_from_headers(r);
                 }
             }
 
+            if (cfg->sethttps) {
+                const char *httpsvalue;
+                if ((httpsvalue = apr_table_get(r->headers_in, "X-Forwarded-HTTPS")) ||
+                    (httpsvalue = apr_table_get(r->headers_in, "X-HTTPS"))) {
+                    apr_table_set(r->subprocess_env, "HTTPS", apr_pstrdup(r->pool, httpsvalue));
+                }
+            }
+
+             if (cfg->setport) {
+                const char *portvalue;
+                if ((portvalue = apr_table_get(r->headers_in, "X-Forwarded-Port")) ||
+                    (portvalue = apr_table_get(r->headers_in, "X-Port"))) {
+                  r->server->port = atoi(portvalue);
+                }
+            }
         }
     }
     return DECLINED;
@@ -207,33 +238,47 @@ static int change_remote_ip(request_rec *r) {
 
 static const command_rec rpaf_cmds[] = {
     AP_INIT_FLAG(
-                 "RPAFenable",
+                 "RPAF_Enable",
                  rpaf_enable,
                  NULL,
                  RSRC_CONF,
                  "Enable mod_rpaf"
                  ),
     AP_INIT_FLAG(
-                 "RPAFsethostname",
+                 "RPAF_SetHostName",
                  rpaf_sethostname,
                  NULL,
                  RSRC_CONF,
-                 "Let mod_rpaf set the hostname from X-Host header and update vhosts"
+                 "Let mod_rpaf set the hostname from the X-Host header and update vhosts"
+                 ),
+    AP_INIT_FLAG(
+                 "RPAF_SetHTTPS",
+                 rpaf_sethttps,
+                 NULL,
+                 RSRC_CONF,
+                 "Let mod_rpaf set the HTTPS environment variable from the X-HTTPS header"
+                 ),
+    AP_INIT_FLAG(
+                 "RPAF_SetPort",
+                 rpaf_sethttps,
+                 NULL,
+                 RSRC_CONF,
+                 "Let mod_rpaf set the server port from the X-Port header"
                  ),
     AP_INIT_ITERATE(
-                    "RPAFproxy_ips",
-                    rpaf_set_proxy_ip,
-                    NULL,
-                    RSRC_CONF,
-                    "IP(s) of Proxy server setting X-Forwarded-For header"
-                    ),
+                 "RPAF_ProxyIPs",
+                 rpaf_set_proxy_ip,
+                 NULL,
+                 RSRC_CONF,
+                 "IP(s) of Proxy server setting X-Forwarded-For header"
+                 ),
     AP_INIT_TAKE1(
-                    "RPAFheader",
-                    rpaf_set_headername,
-                    NULL,
-                    RSRC_CONF,
-                    "Which header to look for when trying to find the real ip of the client in a proxy setup"
-                    ),
+                 "RPAF_IPHeaderName",
+                 rpaf_set_headername,
+                 NULL,
+                 RSRC_CONF,
+                 "Which header to look for when trying to find the real ip of the client in a proxy setup"
+                 ),
     { NULL }
 };
 
