@@ -275,7 +275,7 @@ static const command_rec rpaf_cmds[] = {
                  "IP(s) of Proxy server setting X-Forwarded-For header"
                  ),
     AP_INIT_TAKE1(
-                 "RPAF_IPHeaderName",
+                 "RPAF_Header",
                  rpaf_set_headername,
                  NULL,
                  RSRC_CONF,
