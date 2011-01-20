@@ -4,15 +4,17 @@
 
 Sets `REMOTE_ADDR`, `HTTPS`, and `HTTP_PORT` to the values provided by an upstream proxy.
 
-### Requirements
+### Compile Debian/Ubuntu Package and Install
 
-* Ubuntu/Debian: apache2-(prefork|threaded)-dev
-* CentOS/RedHat: httpd-devel
+    sudo apt-get install build-essential apache2-threaded-dev yada
+    dpkg-buildpackage -b
+    sudo dpkg -i ../libapache2-mod-rpaf_X.X-X.X_XXX.deb
 
-### Compile and Install for Apache 2.0
+### Compile and Install for RedHat/CentOS
 
+    yum install httpd-devel
     make
-    sudo make install
+    make install
 
 ### Configuration Directives
 
