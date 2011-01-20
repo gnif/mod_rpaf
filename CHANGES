@@ -1,0 +1,24 @@
+Keep Alive Problem reported and patched by Christian Schneider
+ Also reported by Hiroyuki OYAMA and Vladimir Klebanov
+mod_rpaf was incorrectly using r->pool to allocate memory for the
+ip. The correct pool for this when you are dealing wth keep-alive
+requests was r->connection->pool.
+
+Adding configurable header to work with common Russian setups that
+use X-Real-Ip instead of X-Forwarded-For.
+
+Fixing problems with keep-alive connections reusing the original
+X-Forwarded-For ip as the 'remote_ip'. 
+
+Move the `change_remote_ip' handler from being APR_HOOK_MIDDLE to
+APR_HOOK_FIRST to make the module run before modules like mod_geoip.
+
+Thanks to bug reports from 
+
+Yar Odin
+Michael Cramer
+Sridhar Komandur
+Heddy Boubaker
+Mitar
+Sergey Mokryshev
+Günter Knaf

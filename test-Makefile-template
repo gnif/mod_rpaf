@@ -1,0 +1,121 @@
+# Makefile for mod_rpaf.c tests (gmake)
+# $Id: test-Makefile-template 19 2008-01-02 02:55:18Z thomas $
+HTTPD=@@HTTPD@@ -d . -f httpd-rpaf.conf -X
+HTTPD2=@@HTTPD2@@ -d . -f httpd-rpaf.conf-2.0 -X
+
+default:
+	@echo please run make test or make test-2.0 
+	@echo from the root directory of your rpaf sources
+
+test:
+	rm -f rpaf-error_log rpaf_access_log
+	@echo running rpaf apache 1.3.x tests
+	@echo test 1 - no rpaf
+	@echo starting apache ..
+	@$(HTTPD) -D test1 &
+	@./run_test.pl test1
+	@echo stopping apache ..
+	@kill -HUP `cat httpd.pid`
+	@rm httpd.pid
+	@echo test 2 - rpaf enabled
+	@echo starting apache ..
+	@$(HTTPD) -D test2 &
+	@./run_test.pl test2
+	@echo stopping apache ..
+	@kill -HUP `cat httpd.pid`
+	@rm httpd.pid
+	@echo test 3 - rpaf enabled - sethostname enabled
+	@echo starting apache ..
+	@$(HTTPD) -D test3 &
+	@./run_test.pl test3
+	@echo stopping apache ..
+	@kill -HUP `cat httpd.pid`
+	@rm httpd.pid
+	@echo test 4 - rpaf enabled - sethostname enabled - specifying header
+	@echo setting X-Forwarded-For
+	@echo starting apache ..
+	@$(HTTPD) -D test4 &
+	@./run_test.pl test4
+	@echo stopping apache ..
+	@kill -HUP `cat httpd.pid`
+	@rm httpd.pid
+	@echo test 5 - rpaf enabled - sethostname enabled - specifying header
+	@echo setting X-Real-IP
+	@echo starting apache ..
+	@$(HTTPD) -D test5 &
+	@./run_test.pl test5
+	@echo stopping apache ..
+	@kill -HUP `cat httpd.pid`
+	@rm httpd.pid
+	@echo test 6 - X-Forwarded-For Keep-Alive test
+	@echo starting apache ..
+	@$(HTTPD) -D test6 &
+	@./run_test.pl test6
+	@echo stopping apache ..
+	@kill -HUP `cat httpd.pid`
+	@rm httpd.pid
+	@echo test 7 - X-Forwarded-For Keep-Alive test with HostNameLookups On
+	@echo starting apache ..
+	@$(HTTPD) -D test7 &
+	@./run_test.pl test7
+	@echo stopping apache ..
+	@kill -HUP `cat httpd.pid`
+	@rm httpd.pid
+
+test-2.0:
+	rm -f rpaf-error_log rpaf-access_log
+	@echo running rpaf apache 2.x.x tests
+	@echo test 1 - no rpaf
+	@echo starting apache ..
+	@$(HTTPD2) -D test1 &
+	@./run_test.pl test1
+	@echo stopping apache ..
+	@kill -9 `cat httpd.pid`
+	@rm httpd.pid
+	@echo test 2 - rpaf enabled
+	@echo starting apache ..
+	@$(HTTPD2) -D test2 &
+	@./run_test.pl test2
+	@echo stopping apache ..
+	@kill -9 `cat httpd.pid`
+	@rm httpd.pid
+	@echo test 3 - rpaf enabled - sethostname enabled
+	@echo starting apache ..
+	@$(HTTPD2) -D test3 &
+	@./run_test.pl test3
+	@echo stopping apache ..
+	@kill -9 `cat httpd.pid`
+	@rm httpd.pid
+	@echo test 4 - rpaf enabled - sethostname enabled - specifying header
+	@echo setting X-Forwarded-For
+	@echo starting apache ..
+	@$(HTTPD2) -D test4 &
+	@./run_test.pl test4
+	@echo stopping apache ..
+	@kill -9 `cat httpd.pid`
+	@rm httpd.pid
+	@echo test 5 - rpaf enabled - sethostname enabled - specifying header
+	@echo setting X-Real-IP
+	@echo starting apache ..
+	@$(HTTPD2) -D test5 &
+	@./run_test.pl test5
+	@echo stopping apache ..
+	@kill -9 `cat httpd.pid`
+	@rm httpd.pid
+	@echo test 6 - X-Forwarded-For Keep-Alive test
+	@echo starting apache ..
+	@$(HTTPD2) -D test6 &
+	@./run_test.pl test6
+	@echo stopping apache ..
+	@kill -9 `cat httpd.pid`
+	@rm httpd.pid
+	@echo test 7 - X-Forwarded-For Keep-Alive test with HostNameLookups On
+	@echo starting apache ..
+	@$(HTTPD2) -D test7 &
+	@./run_test.pl test7
+	@echo stopping apache ..
+	@kill -9 `cat httpd.pid`
+	@rm httpd.pid
+
+clean:
+	rm -rf httpd.pid rpaf-access_log rpaf-error_log httpd-rpaf.conf httpd-rpaf.conf-2.0 Makefile
