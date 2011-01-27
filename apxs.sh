@@ -1,7 +1,7 @@
 #!/bin/sh
-APXS=`which apxs2`
+APXS=`which apxs2 2>/dev/null`
 if [ -z "$APXS" ]; then
-  APXS=`which apxs`
+  APXS=`which apxs 2>/dev/null`
 fi
 
 if [ -z "$APXS" ]; then
