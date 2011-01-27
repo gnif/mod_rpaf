@@ -38,7 +38,7 @@ Sets `REMOTE_ADDR`, `HTTPS`, and `HTTP_PORT` to the values provided by an upstre
 
 ## Example Configuration
 
-    LoadModule        modules/mod_rpaf.so
+    LoadModule        rpaf_module modules/mod_rpaf.so
     RPAF_Enable       On
     RPAF_ProxyIPs     127.0.0.1 10.0.0.10 10.0.0.20
     RPAF_SetHostName  On
