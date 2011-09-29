@@ -116,17 +116,21 @@ static int check_cidr(apr_pool_t *pool, const char *ipcidr, const char *testip) 
     /* TODO: this might not be portable.  just use struct in_addr instead? */
     uint32_t ipval, testipval;
 
+    /* TODO: this iterates once to copy and iterates again to tokenize */
     ip = apr_pstrdup(pool, ipcidr);
-    /* TODO: this iterates once to copy and iterates again for length */
-    ipcidr_len = strlen(ip);
-    cidr = (char *) memchr(ip + (ipcidr_len - 3), '/', 3);
+    cidr = ip;
+    while (*cidr != '\0') {
+        if (*cidr == '/') {
+            *(cidr++) = '\0';
+            break;
+        }
+        cidr++;
+    }
 
     if (cidr == NULL) {
         return -1;
     }
 
-    *cidr = '\0';
-    cidr++;
     cidr_val = atoi(cidr);
     if (cidr_val < 1 || cidr_val > 32) {
         return -1;
