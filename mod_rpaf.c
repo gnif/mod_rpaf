@@ -135,7 +135,7 @@ static int check_cidr(apr_pool_t *pool, const char *ipcidr, const char *testip) 
         return -1;
     }
 
-    netmask = 0xffffffff << (32 - atoi(cidr));
+    netmask = 0xffffffff << (32 - cidr_val);
     ipval = ntohl(inet_addr(ip));
     testipval = ntohl(inet_addr(testip));
 
