@@ -12,7 +12,7 @@ mod_rpaf.so: mod_rpaf.c
 mod_rpaf.c:
 
 install: mod_rpaf.so
-	$(APXS) -i -n mod_rpaf.so mod_rpaf.la
+	$(APXS) -i -S LIBEXECDIR=$(DESTDIR)$$($(APXS) -q LIBEXECDIR)/ -n mod_rpaf.so mod_rpaf.la
 
 clean:
 	rm -rf *~ *.o *.so *.lo *.la *.slo *.loT .libs/
