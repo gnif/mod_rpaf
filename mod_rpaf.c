@@ -109,7 +109,6 @@ static const char *rpaf_setport(cmd_parms *cmd, void *dummy, int flag) {
 
 static int check_cidr(apr_pool_t *pool, const char *ipcidr, const char *testip) {
     char *ip;
-    int ipcidr_len;
     int cidr_val;
     unsigned int netmask;
     char *cidr;
