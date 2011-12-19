@@ -33,6 +33,9 @@ typedef struct {
     int                setport;
     const char         *headername;
     apr_array_header_t *proxy_ips;
+    const char         *orig_scheme;
+    const char         *https_scheme;
+    int                orig_port;
 } rpaf_server_cfg;
 
 typedef struct {
@@ -48,6 +51,10 @@ static void *rpaf_create_server_cfg(apr_pool_t *p, server_rec *s) {
     cfg->proxy_ips = apr_array_make(p, 0, sizeof(char *));
     cfg->enable = 0;
     cfg->sethostname = 0;
+
+    cfg->orig_scheme  = s->server_scheme;
+    cfg->https_scheme = apr_pstrdup(p, "https");
+    cfg->orig_port    = s->port;
 
     return (void *)cfg;
 }
@@ -159,7 +166,7 @@ static int is_in_array(apr_pool_t *pool, const char *remote_ip, apr_array_header
 
 static apr_status_t rpaf_cleanup(void *data) {
     rpaf_cleanup_rec *rcr = (rpaf_cleanup_rec *)data;
-    rcr->r->connection->remote_ip   = apr_pstrdup(rcr->r->connection->pool, rcr->old_ip);
+    rcr->r->connection->remote_ip = apr_pstrdup(rcr->r->connection->pool, rcr->old_ip);
     rcr->r->connection->remote_addr->sa.sin.sin_addr.s_addr = apr_inet_addr(rcr->r->connection->remote_ip);
     return APR_SUCCESS;
 }
@@ -231,14 +238,20 @@ static int change_remote_ip(request_rec *r) {
                 if ((httpsvalue = apr_table_get(r->headers_in, "X-Forwarded-HTTPS")) ||
                     (httpsvalue = apr_table_get(r->headers_in, "X-HTTPS"))) {
                     apr_table_set(r->subprocess_env, "HTTPS", apr_pstrdup(r->pool, httpsvalue));
-                }
+                    r->server->server_scheme = cfg->https_scheme;
+                } else {
+                    r->server->server_scheme = cfg->orig_scheme;
+                }}
             }
 
              if (cfg->setport) {
                 const char *portvalue;
                 if ((portvalue = apr_table_get(r->headers_in, "X-Forwarded-Port")) ||
                     (portvalue = apr_table_get(r->headers_in, "X-Port"))) {
-                  r->server->port = atoi(portvalue);
+                    r->server->port    = atoi(portvalue);
+                    r->parsed_uri.port = r->server->port;
+                } else {
+                    r->server->port = cfg->orig_port;
                 }
             }
         }
