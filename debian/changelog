@@ -1,3 +1,9 @@
+libapache2-mod-rpaf (0.8.1-0.1) unstable; urgency=low
+
+  * Version bump in the redhat specfile
+
+ -- Geoffrey McRae <gnif@xbmc.org>  Mon, 19 Dec 2011 14:21:42 +1000
+
 libapache2-mod-rpaf (0.8-0.1) unstable; urgency=low
 
   * Fixed issue with setting the port back when the header isnt set
