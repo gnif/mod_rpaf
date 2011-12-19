@@ -241,7 +241,7 @@ static int change_remote_ip(request_rec *r) {
                     r->server->server_scheme = cfg->https_scheme;
                 } else {
                     r->server->server_scheme = cfg->orig_scheme;
-                }}
+                }
             }
 
              if (cfg->setport) {
