@@ -36,6 +36,15 @@ Sets `REMOTE_ADDR`, `HTTPS`, and `HTTP_PORT` to the values provided by an upstre
                                           value contained in X-Port, or
                                           X-Forwarded-Port.
 
+    RPAF_KeepIPForConnection (On|OFF)   - The value in a header with the
+                                          real IP is used for the rest of
+										  the connections life. Useful if
+										  proxy tunnels through connection
+										  from client and only adds
+										  X-Forwarded-For header in first
+										  request of connection.
+										  Defaults to Off.
+					  						
 ## Example Configuration
 
     LoadModule        rpaf_module modules/mod_rpaf.so

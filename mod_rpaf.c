@@ -28,6 +28,7 @@ module AP_MODULE_DECLARE_DATA rpaf_module;
 
 typedef struct {
     int                enable;
+    int                keepipforconnection;
     int                sethostname;
     int                sethttps;
     int                setport;
@@ -84,6 +85,15 @@ static const char *rpaf_enable(cmd_parms *cmd, void *dummy, int flag) {
                                                                    &rpaf_module);
 
     cfg->enable = flag;
+    return NULL;
+}
+
+static const char *rpaf_keepipforconnection(cmd_parms *cmd, void *dummy, int flag) {
+    server_rec *s = cmd->server;
+    rpaf_server_cfg *cfg = (rpaf_server_cfg *)ap_get_module_config(s->module_config, 
+                                                                   &rpaf_module);
+
+    cfg->keepipforconnection = flag;
     return NULL;
 }
 
@@ -203,16 +213,18 @@ static int change_remote_ip(request_rec *r) {
         }
 
         if (fwdvalue) {
-            rpaf_cleanup_rec *rcr = (rpaf_cleanup_rec *)apr_pcalloc(r->pool, sizeof(rpaf_cleanup_rec));
             apr_array_header_t *arr = apr_array_make(r->pool, 0, sizeof(char*));
             while (*fwdvalue && (val = ap_get_token(r->pool, &fwdvalue, 1))) {
                 *(char **)apr_array_push(arr) = apr_pstrdup(r->pool, val);
                 if (*fwdvalue != '\0')
                     ++fwdvalue;
             }
-            rcr->old_ip = apr_pstrdup(r->connection->pool, r->connection->remote_ip);
-            rcr->r = r;
-            apr_pool_cleanup_register(r->pool, (void *)rcr, rpaf_cleanup, apr_pool_cleanup_null);
+	    if (! cfg->keepipforconnection) {
+	      rpaf_cleanup_rec *rcr = (rpaf_cleanup_rec *)apr_pcalloc(r->pool, sizeof(rpaf_cleanup_rec));
+	      rcr->old_ip = apr_pstrdup(r->connection->pool, r->connection->remote_ip);
+	      rcr->r = r;
+	      apr_pool_cleanup_register(r->pool, (void *)rcr, rpaf_cleanup, apr_pool_cleanup_null);
+	    }
             r->connection->remote_ip = apr_pstrdup(r->connection->pool, last_not_in_array(r->pool, arr, cfg->proxy_ips));
             r->connection->remote_addr->sa.sin.sin_addr.s_addr = apr_inet_addr(r->connection->remote_ip);
 
@@ -267,6 +279,13 @@ static const command_rec rpaf_cmds[] = {
                  RSRC_CONF,
                  "Enable mod_rpaf"
                  ),
+    AP_INIT_FLAG(
+		 "RPAF_KeepIPForConnection",
+		 rpaf_keepipforconnection,
+		 NULL,
+		 RSRC_CONF,
+		 "Use IP for whole connection"
+		 ),
     AP_INIT_FLAG(
                  "RPAF_SetHostName",
                  rpaf_sethostname,
