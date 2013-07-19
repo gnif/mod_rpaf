@@ -239,6 +239,10 @@ static int change_remote_ip(request_rec *r) {
                     (httpsvalue = apr_table_get(r->headers_in, "X-HTTPS"))) {
                     apr_table_set(r->subprocess_env, "HTTPS", apr_pstrdup(r->pool, httpsvalue));
                     r->server->server_scheme = cfg->https_scheme;
+                } else if ((httpsvalue = apr_table_get(r->headers_in, "X-Forwarded-Proto"))
+                           && (strcmp(httpsvalue, cfg->https_scheme) == 0)) {
+                    apr_table_set(r->subprocess_env, "HTTPS", apr_pstrdup(r->pool, "on"));
+                    r->server->server_scheme = cfg->https_scheme;
                 } else {
                     r->server->server_scheme = cfg->orig_scheme;
                 }
