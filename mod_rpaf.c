@@ -185,6 +185,8 @@ static char* last_not_in_array(apr_pool_t *pool,
 static int change_remote_ip(request_rec *r) {
     const char *fwdvalue;
     char *val;
+    apr_port_t tmpport;
+    apr_pool_t *tmppool;
     rpaf_server_cfg *cfg = (rpaf_server_cfg *)ap_get_module_config(r->server->module_config,
                                                                    &rpaf_module);
 
@@ -214,8 +216,12 @@ static int change_remote_ip(request_rec *r) {
             rcr->r = r;
             apr_pool_cleanup_register(r->pool, (void *)rcr, rpaf_cleanup, apr_pool_cleanup_null);
             r->connection->remote_ip = apr_pstrdup(r->connection->pool, last_not_in_array(r->pool, arr, cfg->proxy_ips));
-            r->connection->remote_addr->sa.sin.sin_addr.s_addr = apr_inet_addr(r->connection->remote_ip);
 
+            tmppool = r->connection->remote_addr->pool;
+            tmpport = r->connection->remote_addr->port;
+            memset(r->connection->remote_addr, '\0', sizeof(apr_sockaddr_t));
+            r->connection->remote_addr = NULL;
+            apr_sockaddr_info_get(&(r->connection->remote_addr), r->connection->remote_ip, APR_UNSPEC, tmpport, 0, tmppool);
             if (cfg->sethostname) {
                 const char *hostvalue;
                 if ((hostvalue = apr_table_get(r->headers_in, "X-Forwarded-Host")) ||
