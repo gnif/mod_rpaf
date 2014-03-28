@@ -3,6 +3,7 @@
 ### Summary
 
 Sets `REMOTE_ADDR`, `HTTPS`, and `HTTP_PORT` to the values provided by an upstream proxy.
+Sets `remoteip-proxy-ip-list` field in r->notes table to list of proxy intermediaries.
 
 ### Compile Debian/Ubuntu Package and Install
 
@@ -23,37 +24,46 @@ Sets `REMOTE_ADDR`, `HTTPS`, and `HTTP_PORT` to the values provided by an upstre
 
 ### Configuration Directives
 
-    RPAF_Enable      (On|Off)           - Enable reverse proxy add forward
+    RPAF_Enable             (On|Off)                - Enable reverse proxy add forward
 
-    RPAF_ProxyIPs    127.0.0.1 10.0.0.1 - What IPs to adjust requests for
+    RPAF_ProxyIPs           127.0.0.1 10.0.0.0/24   - What IPs & bitmaksed subnets to adjust
+                                                      requests for
 
-    RPAF_Header      X-Forwarded-For    - The header to use for the real IP
-                                          address.
+    RPAF_Header             X-Forwarded-For         - The header to use for the real IP 
+                                                      address.
 
-    RPAF_SetHostName (On|Off)           - Update vhost name so ServerName &
-                                          ServerAlias work
+    RPAF_SetHostName        (On|Off)                - Update vhost name so ServerName &
+                                                      ServerAlias work
 
-    RPAF_SetHTTPS    (On|Off)           - Set the HTTPS environment variable
-                                          to the header value contained in
-                                          X-HTTPS, or X-Forwarded-HTTPS.
+    RPAF_SetHTTPS           (On|Off)                - Set the HTTPS environment variable
+                                                      to the header value contained in
+                                                      X-HTTPS, or X-Forwarded-HTTPS.
 
-    RPAF_SetPort     (On|Off)           - Set the server port to the header
-                                          value contained in X-Port, or
-                                          X-Forwarded-Port.
+    RPAF_SetPort            (On|Off)                - Set the server port to the header
+                                                      value contained in X-Port, or
+                                                      X-Forwarded-Port.
+
+    RPAF_ForbidIfNotProxy   (On|Off)                - Option to forbid request if not from
+                                                      trusted RPAF_ProxyIPs; otherwise
+                                                      cannot be done with Allow/Deny after
+                                                      remote addr substitution
+                                                      
 
 ## Example Configuration
 
-    LoadModule        rpaf_module modules/mod_rpaf.so
-    RPAF_Enable       On
-    RPAF_ProxyIPs     127.0.0.1 10.0.0.10 10.0.0.20
-    RPAF_SetHostName  On
-    RPAF_SetHTTPS     On
-    RPAF_SetPort      On
-  
+    LoadModule              rpaf_module modules/mod_rpaf.so
+    RPAF_Enable             On
+    RPAF_ProxyIPs           127.0.0.1 10.0.0.0/24
+    RPAF_SetHostName        On
+    RPAF_SetHTTPS           On
+    RPAF_SetPort            On
+    RPAF_ForbidIfNotProxy   Off
+
 ## Authors
 
 * Thomas Eibner <thomas@stderr.net>
 * Geoffrey McRae <gnif@xbmc.org>
+* Proxigence Inc. <support@proxigence.com>
 
 ## License and distribution
 
