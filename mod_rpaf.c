@@ -36,6 +36,7 @@ typedef struct {
     const char         *orig_scheme;
     const char         *https_scheme;
     int                orig_port;
+    int                forbid_if_not_proxy;
 } rpaf_server_cfg;
 
 typedef struct {
@@ -48,48 +49,89 @@ static void *rpaf_create_server_cfg(apr_pool_t *p, server_rec *s) {
     if (!cfg)
         return NULL;
 
-    cfg->proxy_ips = apr_array_make(p, 0, sizeof(char *));
+    cfg->proxy_ips = apr_array_make(p, 10, sizeof(apr_ipsubnet_t *));
     cfg->enable = 0;
     cfg->sethostname = 0;
+    cfg->forbid_if_not_proxy = 0;
 
-    cfg->orig_scheme  = s->server_scheme;
+    /* server_rec->server_scheme only available after 2.2.3 */
+    #if AP_SERVER_MINORVERSION_NUMBER > 1 && AP_SERVER_PATCHLEVEL_NUMBER > 2
+    cfg->orig_scheme = s->server_scheme;
+    #endif
+
     cfg->https_scheme = apr_pstrdup(p, "https");
-    cfg->orig_port    = s->port;
+    cfg->orig_port = s->port;
 
     return (void *)cfg;
 }
 
+/* quick check for ipv4/6 likelihood; similar to Apache2.4 mod_remoteip check */
+static int rpaf_looks_like_ip(const char *ip) {
+    const char *ptr = ip;
+
+    while (*ptr == '.' || *ptr == ':' || *ptr == '/' || isdigit(*ptr))
+        ptr++;
+
+    return (*ptr == '\0');
+}
+
 static const char *rpaf_set_proxy_ip(cmd_parms *cmd, void *dummy, const char *proxy_ip) {
+    char *ip, *mask;
+    apr_ipsubnet_t **sub;
+    apr_status_t rv;
     server_rec *s = cmd->server;
-    rpaf_server_cfg *cfg = (rpaf_server_cfg *)ap_get_module_config(s->module_config, 
+    rpaf_server_cfg *cfg = (rpaf_server_cfg *)ap_get_module_config(s->module_config,
                                                                    &rpaf_module);
 
-    /* check for valid syntax of ip */
-    *(char **)apr_array_push(cfg->proxy_ips) = apr_pstrdup(cmd->pool, proxy_ip);
+    if (rpaf_looks_like_ip(proxy_ip)) {
+        ip = apr_pstrdup(cmd->temp_pool, proxy_ip);
+        if (mask = ap_strchr(ip, '/')) {
+            *mask++ = '\0';
+        }
+        sub = (apr_ipsubnet_t **)apr_array_push(cfg->proxy_ips);
+        rv = apr_ipsubnet_create(sub, ip, mask, cmd->pool);
+
+        if (rv != APR_SUCCESS) {
+            char msgbuf[128];
+            apr_strerror(rv, msgbuf, sizeof(msgbuf));
+            return apr_pstrcat(cmd->pool, "mod_rpaf: Error parsing IP ", proxy_ip, " in ",
+                               cmd->cmd->name, ". ", msgbuf, NULL);
+        }
+    }
+
     return NULL;
 }
 
 static const char *rpaf_set_headername(cmd_parms *cmd, void *dummy, const char *headername) {
     server_rec *s = cmd->server;
-    rpaf_server_cfg *cfg = (rpaf_server_cfg *)ap_get_module_config(s->module_config, 
+    rpaf_server_cfg *cfg = (rpaf_server_cfg *)ap_get_module_config(s->module_config,
                                                                    &rpaf_module);
 
-    cfg->headername = headername; 
+    cfg->headername = headername;
     return NULL;
 }
 
 static const char *rpaf_enable(cmd_parms *cmd, void *dummy, int flag) {
     server_rec *s = cmd->server;
-    rpaf_server_cfg *cfg = (rpaf_server_cfg *)ap_get_module_config(s->module_config, 
+    rpaf_server_cfg *cfg = (rpaf_server_cfg *)ap_get_module_config(s->module_config,
                                                                    &rpaf_module);
 
     cfg->enable = flag;
     return NULL;
 }
 
+static const char *rpaf_set_forbid_if_not_proxy(cmd_parms *cmd, void *dummy, int flag) {
+    server_rec *s = cmd->server;
+    rpaf_server_cfg *cfg = (rpaf_server_cfg *)ap_get_module_config(s->module_config,
+                                                                   &rpaf_module);
+
+    cfg->forbid_if_not_proxy = flag;
+    return NULL;
+}
+
 static const char *rpaf_sethostname(cmd_parms *cmd, void *dummy, int flag) {
     server_rec *s = cmd->server;
-    rpaf_server_cfg *cfg = (rpaf_server_cfg *)ap_get_module_config(s->module_config, 
+    rpaf_server_cfg *cfg = (rpaf_server_cfg *)ap_get_module_config(s->module_config,
                                                                    &rpaf_module);
 
     cfg->sethostname = flag;
@@ -98,7 +140,7 @@ static const char *rpaf_sethostname(cmd_parms *cmd, void *dummy, int flag) {
 
 static const char *rpaf_sethttps(cmd_parms *cmd, void *dummy, int flag) {
     server_rec *s = cmd->server;
-    rpaf_server_cfg *cfg = (rpaf_server_cfg *)ap_get_module_config(s->module_config, 
+    rpaf_server_cfg *cfg = (rpaf_server_cfg *)ap_get_module_config(s->module_config,
                                                                    &rpaf_module);
 
     cfg->sethttps = flag;
@@ -107,60 +149,23 @@ static const char *rpaf_sethttps(cmd_parms *cmd, void *dummy, int flag) {
 
 static const char *rpaf_setport(cmd_parms *cmd, void *dummy, int flag) {
     server_rec *s = cmd->server;
-    rpaf_server_cfg *cfg = (rpaf_server_cfg *)ap_get_module_config(s->module_config, 
+    rpaf_server_cfg *cfg = (rpaf_server_cfg *)ap_get_module_config(s->module_config,
                                                                    &rpaf_module);
 
     cfg->setport = flag;
     return NULL;
 }
 
-static int check_cidr(apr_pool_t *pool, const char *ipcidr, const char *testip) {
-    char *ip;
-    int cidr_val;
-    unsigned int netmask;
-    char *cidr;
-    /* TODO: this might not be portable.  just use struct in_addr instead? */
-    uint32_t ipval, testipval;
-
-    /* TODO: this iterates once to copy and iterates again to tokenize */
-    ip = apr_pstrdup(pool, ipcidr);
-    cidr = ip;
-    while (*cidr != '\0') {
-        if (*cidr == '/') {
-            *(cidr++) = '\0';
-            break;
-        }
-        cidr++;
-    }
-
-    if (cidr == NULL) {
-        return -1;
-    }
-
-    cidr_val = atoi(cidr);
-    if (cidr_val < 1 || cidr_val > 32) {
-        return -1;
-    }
-
-    netmask = 0xffffffff << (32 - cidr_val);
-    ipval = ntohl(inet_addr(ip));
-    testipval = ntohl(inet_addr(testip));
-
-    return (ipval & netmask) == (testipval & netmask);
-}
-
-static int is_in_array(apr_pool_t *pool, const char *remote_ip, apr_array_header_t *proxy_ips) {
+static int is_in_array(apr_sockaddr_t *remote_addr, apr_array_header_t *proxy_ips) {
     int i;
-    char **list = (char**)proxy_ips->elts;
-    for (i = 0; i < proxy_ips->nelts; i++) {
-        if (check_cidr(pool, list[i], remote_ip) == 1) {
-            return 1;
-        }
+    apr_ipsubnet_t **subs = (apr_ipsubnet_t **)proxy_ips->elts;
 
-        if (strcmp(remote_ip, list[i]) == 0) {
+    for (i = 0; i < proxy_ips->nelts; i++) {
+        if (apr_ipsubnet_test(subs[i], remote_addr)) {
             return 1;
         }
     }
+
     return 0;
 }
 
@@ -171,20 +176,45 @@ static apr_status_t rpaf_cleanup(void *data) {
     return APR_SUCCESS;
 }
 
-static char* last_not_in_array(apr_pool_t *pool,
-                               apr_array_header_t *forwarded_for,
+static char *last_not_in_array(request_rec *r, apr_array_header_t *forwarded_for,
                                apr_array_header_t *proxy_ips) {
-    int i;
-    for (i = (forwarded_for->nelts)-1; i > 0; i--) {
-        if (!is_in_array(pool, ((char **)forwarded_for->elts)[i], proxy_ips))
-           break;
+    apr_sockaddr_t *sa;
+    apr_status_t rv;
+    char **fwd_ips, *proxy_list;
+    int i, earliest_legit_i = 0;
+
+    proxy_list = apr_pstrdup(r->pool, r->connection->remote_ip);
+    fwd_ips = (char **)forwarded_for->elts;
+
+    for (i = (forwarded_for->nelts); i > 0; ) {
+        i--;
+        rv = apr_sockaddr_info_get(&sa, fwd_ips[i], APR_UNSPEC, 0, 0, r->pool);
+        if (rv == APR_SUCCESS) {
+            earliest_legit_i = i;
+            if (!is_in_array(sa, proxy_ips))
+                break;
+
+            proxy_list = apr_pstrcat(r->pool, proxy_list, ", ", fwd_ips[i], NULL);
+        }
+        else {
+            ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_WARNING, 0, r,
+                          "mod_rpaf: forwarded-for list entry of %s is not a valid IP", fwd_ips[i]);
+        }
     }
-    return ((char **)forwarded_for->elts)[i];
+
+    if (i > 0 || rv == APR_SUCCESS || earliest_legit_i) {
+        /* remoteip-proxy-ip_list r->notes entry is forward compatible with Apache2.4 mod_remoteip*/
+        apr_table_set(r->notes, "remoteip-proxy-ip-list", proxy_list);
+        return fwd_ips[earliest_legit_i];
+    }
+    else {
+        return NULL;
+    }
 }
 
 static int change_remote_ip(request_rec *r) {
-    const char *fwdvalue;
-    char *val;
+    char *fwdvalue, *val, *mask, *last_val;
+    int i;
     apr_port_t tmpport;
     apr_pool_t *tmppool;
     rpaf_server_cfg *cfg = (rpaf_server_cfg *)ap_get_module_config(r->server->module_config,
@@ -193,12 +223,12 @@ static int change_remote_ip(request_rec *r) {
     if (!cfg->enable)
         return DECLINED;
 
-    if (is_in_array(r->pool, r->connection->remote_ip, cfg->proxy_ips) == 1) {
+    if (is_in_array(r->connection->remote_addr, cfg->proxy_ips) == 1) {
         /* check if cfg->headername is set and if it is use
            that instead of X-Forwarded-For by default */
-        if (cfg->headername && (fwdvalue = apr_table_get(r->headers_in, cfg->headername))) {
+        if (cfg->headername && (fwdvalue = (char *)apr_table_get(r->headers_in, cfg->headername))) {
             //
-        } else if ((fwdvalue = apr_table_get(r->headers_in, "X-Forwarded-For"))) {
+        } else if (cfg->headername == NULL && (fwdvalue = (char *)apr_table_get(r->headers_in, "X-Forwarded-For"))) {
             //
         } else {
             return DECLINED;
@@ -206,16 +236,28 @@ static int change_remote_ip(request_rec *r) {
 
         if (fwdvalue) {
             rpaf_cleanup_rec *rcr = (rpaf_cleanup_rec *)apr_pcalloc(r->pool, sizeof(rpaf_cleanup_rec));
-            apr_array_header_t *arr = apr_array_make(r->pool, 0, sizeof(char*));
-            while (*fwdvalue && (val = ap_get_token(r->pool, &fwdvalue, 1))) {
-                *(char **)apr_array_push(arr) = apr_pstrdup(r->pool, val);
-                if (*fwdvalue != '\0')
-                    ++fwdvalue;
+            apr_array_header_t *arr = apr_array_make(r->pool, 4, sizeof(char *));
+
+            while ((val = strsep(&fwdvalue, ",")) != NULL) {
+                /* strip leading and trailing whitespace */
+                while(isspace(*val))
+                    ++val;
+                for (i = strlen(val) - 1; i > 0 && isspace(val[i]); i--)
+                    val[i] = '\0';
+                if (rpaf_looks_like_ip(val))
+                    *(char **)apr_array_push(arr) = apr_pstrdup(r->pool, val);
             }
+
+				if (arr->nelts == 0)
+					return DECLINED;
+
+            if ((last_val = last_not_in_array(r, arr, cfg->proxy_ips)) == NULL)
+                return DECLINED;
+
             rcr->old_ip = apr_pstrdup(r->connection->pool, r->connection->remote_ip);
             rcr->r = r;
             apr_pool_cleanup_register(r->pool, (void *)rcr, rpaf_cleanup, apr_pool_cleanup_null);
-            r->connection->remote_ip = apr_pstrdup(r->connection->pool, last_not_in_array(r->pool, arr, cfg->proxy_ips));
+            r->connection->remote_ip = apr_pstrdup(r->connection->pool, last_val);
 
             tmppool = r->connection->remote_addr->pool;
             tmpport = r->connection->remote_addr->port;
@@ -241,18 +283,22 @@ static int change_remote_ip(request_rec *r) {
             }
 
             if (cfg->sethttps) {
-                const char *httpsvalue;
+                const char *httpsvalue, *scheme;
                 if ((httpsvalue = apr_table_get(r->headers_in, "X-Forwarded-HTTPS")) ||
                     (httpsvalue = apr_table_get(r->headers_in, "X-HTTPS"))) {
                     apr_table_set(r->subprocess_env, "HTTPS", apr_pstrdup(r->pool, httpsvalue));
-                    r->server->server_scheme = cfg->https_scheme;
+
+                    scheme = cfg->https_scheme;
                 } else if ((httpsvalue = apr_table_get(r->headers_in, "X-Forwarded-Proto"))
                            && (strcmp(httpsvalue, cfg->https_scheme) == 0)) {
                     apr_table_set(r->subprocess_env, "HTTPS", apr_pstrdup(r->pool, "on"));
-                    r->server->server_scheme = cfg->https_scheme;
+                    scheme = cfg->https_scheme;
                 } else {
-                    r->server->server_scheme = cfg->orig_scheme;
+                    scheme = cfg->orig_scheme;
                 }
+                #if AP_SERVER_MINORVERSION_NUMBER > 1 && AP_SERVER_PATCHLEVEL_NUMBER > 2
+                r->server->server_scheme = scheme;
+                #endif
             }
 
              if (cfg->setport) {
@@ -266,6 +312,9 @@ static int change_remote_ip(request_rec *r) {
                 }
             }
         }
+    }
+    else if (cfg->forbid_if_not_proxy) {
+        return HTTP_FORBIDDEN;
     }
     return DECLINED;
 }
@@ -298,6 +347,13 @@ static const command_rec rpaf_cmds[] = {
                  NULL,
                  RSRC_CONF,
                  "Let mod_rpaf set the server port from the X-Port header"
+                 ),
+    AP_INIT_FLAG(
+                 "RPAF_ForbidIfNotProxy",
+                 rpaf_set_forbid_if_not_proxy,
+                 NULL,
+                 RSRC_CONF,
+                 "Deny access if connection not from trusted RPAF_ProxyIPs"
                  ),
     AP_INIT_ITERATE(
                  "RPAF_ProxyIPs",
