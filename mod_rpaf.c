@@ -219,9 +219,10 @@ static int change_remote_ip(request_rec *r) {
 
             tmppool = r->connection->remote_addr->pool;
             tmpport = r->connection->remote_addr->port;
-            memset(r->connection->remote_addr, '\0', sizeof(apr_sockaddr_t));
-            r->connection->remote_addr = NULL;
-            apr_sockaddr_info_get(&(r->connection->remote_addr), r->connection->remote_ip, APR_UNSPEC, tmpport, 0, tmppool);
+            apr_sockaddr_t *tmpsa;
+            int ret = apr_sockaddr_info_get(&tmpsa, r->connection->remote_ip, APR_UNSPEC, tmpport, 0, tmppool);
+            if (ret == APR_SUCCESS)
+                memcpy(r->connection->remote_addr, tmpsa, sizeof(apr_sockaddr_t));
             if (cfg->sethostname) {
                 const char *hostvalue;
                 if ((hostvalue = apr_table_get(r->headers_in, "X-Forwarded-Host")) ||
