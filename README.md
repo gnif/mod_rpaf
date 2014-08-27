@@ -5,6 +5,7 @@
 Sets `REMOTE_ADDR`, `HTTPS`, and `HTTP_PORT` to the values provided by an upstream proxy.
 Sets `remoteip-proxy-ip-list` field in r->notes table to list of proxy intermediaries.
 
+
 ### Compile Debian/Ubuntu Package and Install
 
     sudo apt-get install build-essential apache2-threaded-dev yada
@@ -32,11 +33,13 @@ Sets `remoteip-proxy-ip-list` field in r->notes table to list of proxy intermedi
 
     RPAF_SetHTTPS           (On|Off)                - Set the HTTPS environment variable
                                                       to the header value contained in
-                                                      X-HTTPS, or X-Forwarded-HTTPS.
+                                                      X-HTTPS, or X-Forwarded-HTTPS. For
+                                                      best results make sure that mod_ssl
+                                                      is NOT enabled.
 
     RPAF_SetPort            (On|Off)                - Set the server port to the header
                                                       value contained in X-Port, or
-                                                      X-Forwarded-Port.
+                                                      X-Forwarded-Port. (See Issue #12)
 
     RPAF_ForbidIfNotProxy   (On|Off)                - Option to forbid request if not from
                                                       trusted RPAF_ProxyIPs; otherwise
