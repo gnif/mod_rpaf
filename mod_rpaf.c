@@ -25,6 +25,7 @@
 #include <arpa/inet.h>
 
 module AP_MODULE_DECLARE_DATA rpaf_module;
+APR_DECLARE_OPTIONAL_FN(int, ssl_is_https, (conn_rec *));
 
 typedef struct {
     int                enable;
@@ -389,8 +390,16 @@ static const command_rec rpaf_cmds[] = {
     { NULL }
 };
 
+static int ssl_is_https(conn_rec *c) {
+    return apr_table_get(c->notes, "rpaf_https") != NULL;
+}
+
 static void rpaf_register_hooks(apr_pool_t *p) {
     ap_hook_post_read_request(rpaf_post_read_request, NULL, NULL, APR_HOOK_FIRST);
+
+    /* this will only work if mod_ssl is not loaded */
+    if (APR_RETRIEVE_OPTIONAL_FN(ssl_is_https) == NULL)
+        APR_REGISTER_OPTIONAL_FN(ssl_is_https);
 }
 
 module AP_MODULE_DECLARE_DATA rpaf_module = {
