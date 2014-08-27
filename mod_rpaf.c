@@ -223,99 +223,104 @@ static int change_remote_ip(request_rec *r) {
     if (!cfg->enable)
         return DECLINED;
 
-    if (is_in_array(r->connection->remote_addr, cfg->proxy_ips) == 1) {
-        /* check if cfg->headername is set and if it is use
-           that instead of X-Forwarded-For by default */
-        if (cfg->headername && (fwdvalue = (char *)apr_table_get(r->headers_in, cfg->headername))) {
-            //
-        } else if (cfg->headername == NULL && (fwdvalue = (char *)apr_table_get(r->headers_in, "X-Forwarded-For"))) {
-            //
+    /* check if the remote_addr is in the allowed proxy IP list */
+    if (is_in_array(r->connection->remote_addr, cfg->proxy_ips) != 1) {
+        if (cfg->forbid_if_not_proxy)
+            return HTTP_FORBIDDEN;
+        return DECLINED;
+    }
+
+    /* check if cfg->headername is set and if it is use
+       that instead of X-Forwarded-For by default */
+    if (cfg->headername && (fwdvalue = (char *)apr_table_get(r->headers_in, cfg->headername))) {
+        //
+    } else if (cfg->headername == NULL && (fwdvalue = (char *)apr_table_get(r->headers_in, "X-Forwarded-For"))) {
+        //
+    } else {
+        return DECLINED;
+    }
+
+    /* if there was no forwarded for header then we dont do anything */
+    if (!fwdvalue)
+        return DECLINED;
+
+    rpaf_cleanup_rec *rcr = (rpaf_cleanup_rec *)apr_pcalloc(r->pool, sizeof(rpaf_cleanup_rec));
+    apr_array_header_t *arr = apr_array_make(r->pool, 4, sizeof(char *));
+
+    while ((val = strsep(&fwdvalue, ",")) != NULL) {
+        /* strip leading and trailing whitespace */
+        while(isspace(*val))
+            ++val;
+        for (i = strlen(val) - 1; i > 0 && isspace(val[i]); i--)
+            val[i] = '\0';
+        if (rpaf_looks_like_ip(val))
+            *(char **)apr_array_push(arr) = apr_pstrdup(r->pool, val);
+    }
+
+    if (arr->nelts == 0)
+        return DECLINED;
+
+    if ((last_val = last_not_in_array(r, arr, cfg->proxy_ips)) == NULL)
+        return DECLINED;
+
+    rcr->old_ip = apr_pstrdup(r->connection->pool, r->connection->remote_ip);
+    rcr->r = r;
+    apr_pool_cleanup_register(r->pool, (void *)rcr, rpaf_cleanup, apr_pool_cleanup_null);
+    r->connection->remote_ip = apr_pstrdup(r->connection->pool, last_val);
+
+    tmppool = r->connection->remote_addr->pool;
+    tmpport = r->connection->remote_addr->port;
+    apr_sockaddr_t *tmpsa;
+    int ret = apr_sockaddr_info_get(&tmpsa, r->connection->remote_ip, APR_UNSPEC, tmpport, 0, tmppool);
+    if (ret == APR_SUCCESS)
+        memcpy(r->connection->remote_addr, tmpsa, sizeof(apr_sockaddr_t));
+    if (cfg->sethostname) {
+        const char *hostvalue;
+        if ((hostvalue = apr_table_get(r->headers_in, "X-Forwarded-Host")) ||
+            (hostvalue = apr_table_get(r->headers_in, "X-Host"))) {
+            apr_array_header_t *arr = apr_array_make(r->pool, 0, sizeof(char*));
+            while (*hostvalue && (val = ap_get_token(r->pool, &hostvalue, 1))) {
+                *(char **)apr_array_push(arr) = apr_pstrdup(r->pool, val);
+                if (*hostvalue != '\0')
+                  ++hostvalue;
+            }
+
+            apr_table_set(r->headers_in, "Host", apr_pstrdup(r->pool, ((char **)arr->elts)[((arr->nelts)-1)]));
+            r->hostname = apr_pstrdup(r->pool, ((char **)arr->elts)[((arr->nelts)-1)]);
+            ap_update_vhost_from_headers(r);
+        }
+    }
+
+    if (cfg->sethttps) {
+        const char *httpsvalue, *scheme;
+        if ((httpsvalue = apr_table_get(r->headers_in, "X-Forwarded-HTTPS")) ||
+            (httpsvalue = apr_table_get(r->headers_in, "X-HTTPS"))) {
+            apr_table_set(r->subprocess_env, "HTTPS", apr_pstrdup(r->pool, httpsvalue));
+
+            scheme = cfg->https_scheme;
+        } else if ((httpsvalue = apr_table_get(r->headers_in, "X-Forwarded-Proto"))
+                   && (strcmp(httpsvalue, cfg->https_scheme) == 0)) {
+            apr_table_set(r->subprocess_env, "HTTPS", apr_pstrdup(r->pool, "on"));
+            scheme = cfg->https_scheme;
         } else {
-            return DECLINED;
+            scheme = cfg->orig_scheme;
         }
+        #if AP_SERVER_MINORVERSION_NUMBER > 1 && AP_SERVER_PATCHLEVEL_NUMBER > 2
+        r->server->server_scheme = scheme;
+        #endif
+    }
 
-        if (fwdvalue) {
-            rpaf_cleanup_rec *rcr = (rpaf_cleanup_rec *)apr_pcalloc(r->pool, sizeof(rpaf_cleanup_rec));
-            apr_array_header_t *arr = apr_array_make(r->pool, 4, sizeof(char *));
-
-            while ((val = strsep(&fwdvalue, ",")) != NULL) {
-                /* strip leading and trailing whitespace */
-                while(isspace(*val))
-                    ++val;
-                for (i = strlen(val) - 1; i > 0 && isspace(val[i]); i--)
-                    val[i] = '\0';
-                if (rpaf_looks_like_ip(val))
-                    *(char **)apr_array_push(arr) = apr_pstrdup(r->pool, val);
-            }
-
-				if (arr->nelts == 0)
-					return DECLINED;
-
-            if ((last_val = last_not_in_array(r, arr, cfg->proxy_ips)) == NULL)
-                return DECLINED;
-
-            rcr->old_ip = apr_pstrdup(r->connection->pool, r->connection->remote_ip);
-            rcr->r = r;
-            apr_pool_cleanup_register(r->pool, (void *)rcr, rpaf_cleanup, apr_pool_cleanup_null);
-            r->connection->remote_ip = apr_pstrdup(r->connection->pool, last_val);
-
-            tmppool = r->connection->remote_addr->pool;
-            tmpport = r->connection->remote_addr->port;
-            apr_sockaddr_t *tmpsa;
-            int ret = apr_sockaddr_info_get(&tmpsa, r->connection->remote_ip, APR_UNSPEC, tmpport, 0, tmppool);
-            if (ret == APR_SUCCESS)
-                memcpy(r->connection->remote_addr, tmpsa, sizeof(apr_sockaddr_t));
-            if (cfg->sethostname) {
-                const char *hostvalue;
-                if ((hostvalue = apr_table_get(r->headers_in, "X-Forwarded-Host")) ||
-                    (hostvalue = apr_table_get(r->headers_in, "X-Host"))) {
-                    apr_array_header_t *arr = apr_array_make(r->pool, 0, sizeof(char*));
-                    while (*hostvalue && (val = ap_get_token(r->pool, &hostvalue, 1))) {
-                        *(char **)apr_array_push(arr) = apr_pstrdup(r->pool, val);
-                        if (*hostvalue != '\0')
-                          ++hostvalue;
-                    }
-
-                    apr_table_set(r->headers_in, "Host", apr_pstrdup(r->pool, ((char **)arr->elts)[((arr->nelts)-1)]));
-                    r->hostname = apr_pstrdup(r->pool, ((char **)arr->elts)[((arr->nelts)-1)]);
-                    ap_update_vhost_from_headers(r);
-                }
-            }
-
-            if (cfg->sethttps) {
-                const char *httpsvalue, *scheme;
-                if ((httpsvalue = apr_table_get(r->headers_in, "X-Forwarded-HTTPS")) ||
-                    (httpsvalue = apr_table_get(r->headers_in, "X-HTTPS"))) {
-                    apr_table_set(r->subprocess_env, "HTTPS", apr_pstrdup(r->pool, httpsvalue));
-
-                    scheme = cfg->https_scheme;
-                } else if ((httpsvalue = apr_table_get(r->headers_in, "X-Forwarded-Proto"))
-                           && (strcmp(httpsvalue, cfg->https_scheme) == 0)) {
-                    apr_table_set(r->subprocess_env, "HTTPS", apr_pstrdup(r->pool, "on"));
-                    scheme = cfg->https_scheme;
-                } else {
-                    scheme = cfg->orig_scheme;
-                }
-                #if AP_SERVER_MINORVERSION_NUMBER > 1 && AP_SERVER_PATCHLEVEL_NUMBER > 2
-                r->server->server_scheme = scheme;
-                #endif
-            }
-
-             if (cfg->setport) {
-                const char *portvalue;
-                if ((portvalue = apr_table_get(r->headers_in, "X-Forwarded-Port")) ||
-                    (portvalue = apr_table_get(r->headers_in, "X-Port"))) {
-                    r->server->port    = atoi(portvalue);
-                    r->parsed_uri.port = r->server->port;
-                } else {
-                    r->server->port = cfg->orig_port;
-                }
-            }
+     if (cfg->setport) {
+        const char *portvalue;
+        if ((portvalue = apr_table_get(r->headers_in, "X-Forwarded-Port")) ||
+            (portvalue = apr_table_get(r->headers_in, "X-Port"))) {
+            r->server->port    = atoi(portvalue);
+            r->parsed_uri.port = r->server->port;
+        } else {
+            r->server->port = cfg->orig_port;
         }
     }
-    else if (cfg->forbid_if_not_proxy) {
-        return HTTP_FORBIDDEN;
-    }
+
     return DECLINED;
 }
 
