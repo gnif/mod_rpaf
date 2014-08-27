@@ -223,6 +223,16 @@ static int rpaf_post_read_request(request_rec *r) {
     if (!cfg->enable)
         return DECLINED;
 
+    /* this overcomes an issue when mod_rewrite causes this to get called again
+       and the environment value is lost for HTTPS. This is the only thing that
+       is lost and we do not need to process any further after restoring the
+       value. */
+    const char *rpaf_https = apr_table_get(r->connection->notes, "rpaf_https");
+    if (rpaf_https) {
+        apr_table_set(r->subprocess_env, "HTTPS", rpaf_https);
+        return DECLINED;
+    }
+
     /* check if the remote_addr is in the allowed proxy IP list */
     if (is_in_array(r->connection->remote_addr, cfg->proxy_ips) != 1) {
         if (cfg->forbid_if_not_proxy)
@@ -244,7 +254,6 @@ static int rpaf_post_read_request(request_rec *r) {
     if (!fwdvalue)
         return DECLINED;
 
-    rpaf_cleanup_rec *rcr = (rpaf_cleanup_rec *)apr_pcalloc(r->pool, sizeof(rpaf_cleanup_rec));
     apr_array_header_t *arr = apr_array_make(r->pool, 4, sizeof(char *));
 
     while ((val = strsep(&fwdvalue, ",")) != NULL) {
@@ -263,6 +272,7 @@ static int rpaf_post_read_request(request_rec *r) {
     if ((last_val = last_not_in_array(r, arr, cfg->proxy_ips)) == NULL)
         return DECLINED;
 
+    rpaf_cleanup_rec *rcr = (rpaf_cleanup_rec *)apr_pcalloc(r->pool, sizeof(rpaf_cleanup_rec));
     rcr->old_ip = apr_pstrdup(r->connection->pool, r->connection->remote_ip);
     rcr->r = r;
     apr_pool_cleanup_register(r->pool, (void *)rcr, rpaf_cleanup, apr_pool_cleanup_null);
@@ -295,12 +305,14 @@ static int rpaf_post_read_request(request_rec *r) {
         const char *httpsvalue, *scheme;
         if ((httpsvalue = apr_table_get(r->headers_in, "X-Forwarded-HTTPS")) ||
             (httpsvalue = apr_table_get(r->headers_in, "X-HTTPS"))) {
-            apr_table_set(r->subprocess_env, "HTTPS", apr_pstrdup(r->pool, httpsvalue));
+            apr_table_set(r->connection->notes, "rpaf_https", httpsvalue);
+            apr_table_set(r->subprocess_env   , "HTTPS"     , httpsvalue);
 
             scheme = cfg->https_scheme;
         } else if ((httpsvalue = apr_table_get(r->headers_in, "X-Forwarded-Proto"))
                    && (strcmp(httpsvalue, cfg->https_scheme) == 0)) {
-            apr_table_set(r->subprocess_env, "HTTPS", apr_pstrdup(r->pool, "on"));
+            apr_table_set(r->connection->notes, "rpaf_https", "on");
+            apr_table_set(r->subprocess_env   , "HTTPS"     , "on");
             scheme = cfg->https_scheme;
         } else {
             scheme = cfg->orig_scheme;
