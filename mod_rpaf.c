@@ -212,7 +212,7 @@ static char *last_not_in_array(request_rec *r, apr_array_header_t *forwarded_for
     }
 }
 
-static int change_remote_ip(request_rec *r) {
+static int rpaf_post_read_request(request_rec *r) {
     char *fwdvalue, *val, *mask, *last_val;
     int i;
     apr_port_t tmpport;
@@ -377,8 +377,8 @@ static const command_rec rpaf_cmds[] = {
     { NULL }
 };
 
-static void register_hooks(apr_pool_t *p) {
-    ap_hook_post_read_request(change_remote_ip, NULL, NULL, APR_HOOK_FIRST);
+static void rpaf_register_hooks(apr_pool_t *p) {
+    ap_hook_post_read_request(rpaf_post_read_request, NULL, NULL, APR_HOOK_FIRST);
 }
 
 module AP_MODULE_DECLARE_DATA rpaf_module = {
@@ -388,5 +388,5 @@ module AP_MODULE_DECLARE_DATA rpaf_module = {
     rpaf_create_server_cfg,
     NULL,
     rpaf_cmds,
-    register_hooks,
+    rpaf_register_hooks,
 };
