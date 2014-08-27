@@ -8,13 +8,8 @@ Sets `remoteip-proxy-ip-list` field in r->notes table to list of proxy intermedi
 ### Compile Debian/Ubuntu Package and Install
 
     sudo apt-get install build-essential apache2-threaded-dev yada
-    
-    # for Ubuntu 12.04 you should install yada manually
-    wget http://security.ubuntu.com/ubuntu/pool/universe/y/yada/yada_0.55_all.deb
-    sudo dpkg -i yada_0.55_all.deb 
-    
-    dpkg-buildpackage -b
-    sudo dpkg -i ../libapache2-mod-rpaf_X.X-X.X_XXX.deb
+    make
+    make install   
 
 ### Compile and Install for RedHat/CentOS
 
