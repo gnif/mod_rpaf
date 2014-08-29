@@ -1,3 +1,5 @@
+Changed remote_* to client_* for 2.4 upgrade
+
 Keep Alive Problem reported and patched by Christian Schneider
  Also reported by Hiroyuki OYAMA and Vladimir Klebanov
 mod_rpaf was incorrectly using r->pool to allocate memory for the
