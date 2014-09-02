@@ -204,8 +204,8 @@ static char *last_not_in_array(request_rec *r, apr_array_header_t *forwarded_for
     }
 
     if (i > 0 || rv == APR_SUCCESS || earliest_legit_i) {
-        /* clientip-proxy-ip_list r->notes entry is forward compatible with Apache2.4 mod_remoteip*/
-        apr_table_set(r->notes, "clientip-proxy-ip-list", proxy_list);
+        /* remoteip-proxy-ip_list r->notes entry is forward compatible with Apache2.4 mod_remoteip*/
+        apr_table_set(r->notes, "remoteip-proxy-ip-list", proxy_list);
         return fwd_ips[earliest_legit_i];
     }
     else {

@@ -1,8 +1,6 @@
-## mod_rpaf - reverse proxy add forward 
+## mod_rpaf - reverse proxy add forward
 
 ### Summary
-This build is a preliminary test for Apache 2.4. Please test and tready carefully.
-
 
 Sets `REMOTE_ADDR`, `HTTPS`, and `HTTP_PORT` to the values provided by an upstream proxy.
 Sets `remoteip-proxy-ip-list` field in r->notes table to list of proxy intermediaries.
