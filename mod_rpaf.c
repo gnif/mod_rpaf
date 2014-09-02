@@ -68,10 +68,26 @@ static void *rpaf_create_server_cfg(apr_pool_t *p, server_rec *s) {
 
 /* quick check for ipv4/6 likelihood; similar to Apache2.4 mod_remoteip check */
 static int rpaf_looks_like_ip(const char *ip) {
-    const char *ptr = ip;
+    static const char ipv4_set[] = "0123456789./";
+    static const char ipv6_set[] = "0123456789abcdef:/";
 
-    while (*ptr == '.' || *ptr == ':' || *ptr == '/' || isdigit(*ptr))
-        ptr++;
+    /* zero length value is not valid */
+    if (!*ip)
+      return 0;
+
+    const char *ptr    = ip;
+
+    /* determine if this could be a IPv6 or IPv4 address */
+    if (strchr(ip, ':'))
+    {
+        while(*ptr && strchr(ipv6_set, *ptr) != NULL)
+            ++ptr;
+    }
+    else
+    {
+        while(*ptr && strchr(ipv4_set, *ptr) != NULL)
+            ++ptr;
+    }
 
     return (*ptr == '\0');
 }
@@ -98,6 +114,11 @@ static const char *rpaf_set_proxy_ip(cmd_parms *cmd, void *dummy, const char *pr
             return apr_pstrcat(cmd->pool, "mod_rpaf: Error parsing IP ", proxy_ip, " in ",
                                cmd->cmd->name, ". ", msgbuf, NULL);
         }
+    }
+    else
+    {
+      return apr_pstrcat(cmd->pool, "mod_rpaf: Error parsing IP \"", proxy_ip, "\" in ",
+                         cmd->cmd->name, ". Failed basic parsing.", NULL);     
     }
 
     return NULL;
