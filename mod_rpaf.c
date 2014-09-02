@@ -193,8 +193,8 @@ static int is_in_array(apr_sockaddr_t *remote_addr, apr_array_header_t *proxy_ip
 
 static apr_status_t rpaf_cleanup(void *data) {
     rpaf_cleanup_rec *rcr = (rpaf_cleanup_rec *)data;
-    rcr->r->connection->remote_ip = apr_pstrdup(rcr->r->connection->pool, rcr->old_ip);
-    rcr->r->connection->remote_addr->sa.sin.sin_addr.s_addr = apr_inet_addr(rcr->r->connection->remote_ip);
+    rcr->r->connection->client_ip = apr_pstrdup(rcr->r->connection->pool, rcr->old_ip);
+    rcr->r->connection->client_addr->sa.sin.sin_addr.s_addr = apr_inet_addr(rcr->r->connection->client_ip);
     return APR_SUCCESS;
 }
 
@@ -205,7 +205,7 @@ static char *last_not_in_array(request_rec *r, apr_array_header_t *forwarded_for
     char **fwd_ips, *proxy_list;
     int i, earliest_legit_i = 0;
 
-    proxy_list = apr_pstrdup(r->pool, r->connection->remote_ip);
+    proxy_list = apr_pstrdup(r->pool, r->connection->client_ip);
     fwd_ips = (char **)forwarded_for->elts;
 
     for (i = (forwarded_for->nelts); i > 0; ) {
@@ -255,8 +255,8 @@ static int rpaf_post_read_request(request_rec *r) {
         return DECLINED;
     }
 
-    /* check if the remote_addr is in the allowed proxy IP list */
-    if (is_in_array(r->connection->remote_addr, cfg->proxy_ips) != 1) {
+    /* check if the client_addr is in the allowed proxy IP list */
+    if (is_in_array(r->connection->client_addr, cfg->proxy_ips) != 1) {
         if (cfg->forbid_if_not_proxy)
             return HTTP_FORBIDDEN;
         return DECLINED;
@@ -295,17 +295,17 @@ static int rpaf_post_read_request(request_rec *r) {
         return DECLINED;
 
     rpaf_cleanup_rec *rcr = (rpaf_cleanup_rec *)apr_pcalloc(r->pool, sizeof(rpaf_cleanup_rec));
-    rcr->old_ip = apr_pstrdup(r->connection->pool, r->connection->remote_ip);
+    rcr->old_ip = apr_pstrdup(r->connection->pool, r->connection->client_ip);
     rcr->r = r;
     apr_pool_cleanup_register(r->pool, (void *)rcr, rpaf_cleanup, apr_pool_cleanup_null);
-    r->connection->remote_ip = apr_pstrdup(r->connection->pool, last_val);
+    r->connection->client_ip = apr_pstrdup(r->connection->pool, last_val);
 
-    tmppool = r->connection->remote_addr->pool;
-    tmpport = r->connection->remote_addr->port;
+    tmppool = r->connection->client_addr->pool;
+    tmpport = r->connection->client_addr->port;
     apr_sockaddr_t *tmpsa;
-    int ret = apr_sockaddr_info_get(&tmpsa, r->connection->remote_ip, APR_UNSPEC, tmpport, 0, tmppool);
+    int ret = apr_sockaddr_info_get(&tmpsa, r->connection->client_ip, APR_UNSPEC, tmpport, 0, tmppool);
     if (ret == APR_SUCCESS)
-        memcpy(r->connection->remote_addr, tmpsa, sizeof(apr_sockaddr_t));
+        memcpy(r->connection->client_addr, tmpsa, sizeof(apr_sockaddr_t));
     if (cfg->sethostname) {
         const char *hostvalue;
         if ((hostvalue = apr_table_get(r->headers_in, "X-Forwarded-Host")) ||
