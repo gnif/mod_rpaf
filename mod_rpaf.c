@@ -14,6 +14,17 @@
    limitations under the License.
 */
 
+#include "ap_release.h"
+#if AP_SERVER_MAJORVERSION_NUMBER >= 2 && AP_SERVER_MINORVERSION_NUMBER >= 4
+  #define DEF_IP   useragent_ip
+  #define DEF_ADDR useragent_addr
+  #define DEF_POOL pool
+#else
+  #define DEF_IP   connection->remote_ip
+  #define DEF_ADDR connection->remote_addr
+  #define DEF_POOL connection->pool
+#endif
+
 #include "httpd.h"
 #include "http_config.h"
 #include "http_core.h"
@@ -22,6 +33,7 @@
 #include "http_vhost.h"
 #include "apr_strings.h"
 
+#include <ctype.h> // isspace
 #include <arpa/inet.h>
 
 module AP_MODULE_DECLARE_DATA rpaf_module;
@@ -193,8 +205,8 @@ static int is_in_array(apr_sockaddr_t *remote_addr, apr_array_header_t *proxy_ip
 
 static apr_status_t rpaf_cleanup(void *data) {
     rpaf_cleanup_rec *rcr = (rpaf_cleanup_rec *)data;
-    rcr->r->connection->remote_ip = apr_pstrdup(rcr->r->connection->pool, rcr->old_ip);
-    rcr->r->connection->remote_addr->sa.sin.sin_addr.s_addr = apr_inet_addr(rcr->r->connection->remote_ip);
+    rcr->r->DEF_IP = apr_pstrdup(rcr->r->connection->pool, rcr->old_ip);
+    rcr->r->DEF_ADDR->sa.sin.sin_addr.s_addr = apr_inet_addr(rcr->r->DEF_IP);
     return APR_SUCCESS;
 }
 
@@ -205,7 +217,7 @@ static char *last_not_in_array(request_rec *r, apr_array_header_t *forwarded_for
     char **fwd_ips, *proxy_list;
     int i, earliest_legit_i = 0;
 
-    proxy_list = apr_pstrdup(r->pool, r->connection->remote_ip);
+    proxy_list = apr_pstrdup(r->pool, r->DEF_IP);
     fwd_ips = (char **)forwarded_for->elts;
 
     for (i = (forwarded_for->nelts); i > 0; ) {
@@ -256,7 +268,7 @@ static int rpaf_post_read_request(request_rec *r) {
     }
 
     /* check if the remote_addr is in the allowed proxy IP list */
-    if (is_in_array(r->connection->remote_addr, cfg->proxy_ips) != 1) {
+    if (is_in_array(r->DEF_ADDR, cfg->proxy_ips) != 1) {
         if (cfg->forbid_if_not_proxy)
             return HTTP_FORBIDDEN;
         return DECLINED;
@@ -295,17 +307,17 @@ static int rpaf_post_read_request(request_rec *r) {
         return DECLINED;
 
     rpaf_cleanup_rec *rcr = (rpaf_cleanup_rec *)apr_pcalloc(r->pool, sizeof(rpaf_cleanup_rec));
-    rcr->old_ip = apr_pstrdup(r->connection->pool, r->connection->remote_ip);
+    rcr->old_ip = apr_pstrdup(r->DEF_POOL, r->DEF_IP);
     rcr->r = r;
     apr_pool_cleanup_register(r->pool, (void *)rcr, rpaf_cleanup, apr_pool_cleanup_null);
-    r->connection->remote_ip = apr_pstrdup(r->connection->pool, last_val);
+    r->DEF_IP = apr_pstrdup(r->DEF_POOL, last_val);
 
-    tmppool = r->connection->remote_addr->pool;
-    tmpport = r->connection->remote_addr->port;
+    tmppool = r->DEF_ADDR->pool;
+    tmpport = r->DEF_ADDR->port;
     apr_sockaddr_t *tmpsa;
-    int ret = apr_sockaddr_info_get(&tmpsa, r->connection->remote_ip, APR_UNSPEC, tmpport, 0, tmppool);
+    int ret = apr_sockaddr_info_get(&tmpsa, r->DEF_IP, APR_UNSPEC, tmpport, 0, tmppool);
     if (ret == APR_SUCCESS)
-        memcpy(r->connection->remote_addr, tmpsa, sizeof(apr_sockaddr_t));
+        memcpy(r->DEF_ADDR, tmpsa, sizeof(apr_sockaddr_t));
     if (cfg->sethostname) {
         const char *hostvalue;
         if ((hostvalue = apr_table_get(r->headers_in, "X-Forwarded-Host")) ||
