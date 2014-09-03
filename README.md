@@ -41,6 +41,10 @@ Sets `remoteip-proxy-ip-list` field in r->notes table to list of proxy intermedi
                                                       value contained in X-Port, or
                                                       X-Forwarded-Port. (See Issue #12)
 
+    RPAF_CleanHeaders       (On|Off)                - Cleanup the headers added/altered by
+                                                      the reverse proxy to hide it from the
+                                                      client application.
+
     RPAF_ForbidIfNotProxy   (On|Off)                - Option to forbid request if not from
                                                       trusted RPAF_ProxyIPs; otherwise
                                                       cannot be done with Allow/Deny after
