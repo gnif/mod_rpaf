@@ -417,11 +417,13 @@ static int rpaf_post_read_request(request_rec *r) {
         }
 
         if (!portvalue) {
-            header_port     = NULL;
-            r->server->port = cfg->orig_port;
+            header_port            = NULL;
+            r->parsed_uri.port     = 0;
+            r->parsed_uri.port_str = NULL;
         } else {
-            r->server->port    = atoi(portvalue);
-            r->parsed_uri.port = r->server->port;
+            r->parsed_uri.port     = atoi(portvalue);
+            r->parsed_uri.port_str = apr_pstrcat(r->pool, ":", portvalue, NULL);
+
         }
     }
 
