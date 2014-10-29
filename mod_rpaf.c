@@ -270,8 +270,7 @@ static int rpaf_post_read_request(request_rec *r) {
     /* this overcomes an issue when mod_rewrite causes this to get called again
        and the environment value is lost for HTTPS. This is the only thing that
        is lost and we do not need to process any further after restoring the
-       value. Note that this check uses the *per-request* note - otherwise we
-       would shortcut here for every subsequent request */
+       value. */
     const char *rpaf_https = apr_table_get(r->notes, "rpaf_https");
     if (rpaf_https) {
         apr_table_set(r->subprocess_env, "HTTPS", rpaf_https);
@@ -389,7 +388,7 @@ static int rpaf_post_read_request(request_rec *r) {
                        (explained in an earlier comment), and a per-connection note
                        to allow our version of ssl_is_https() to work.
                      */
-                    apr_table_set(r->notes, "rpaf_https", "on");
+                    apr_table_set(r->notes            , "rpaf_https", "on");
                     apr_table_set(r->connection->notes, "rpaf_https", "on");
                     apr_table_set(r->subprocess_env   , "HTTPS"     , "on");
                     scheme = cfg->https_scheme;
@@ -401,7 +400,7 @@ static int rpaf_post_read_request(request_rec *r) {
                 scheme       = cfg->orig_scheme;
             }
         } else {
-            apr_table_set(r->notes, "rpaf_https", httpsvalue);
+            apr_table_set(r->notes            , "rpaf_https", httpsvalue);
             apr_table_set(r->connection->notes, "rpaf_https", httpsvalue);
             apr_table_set(r->subprocess_env   , "HTTPS"     , httpsvalue);
             scheme = cfg->https_scheme;
