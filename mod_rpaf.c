@@ -48,7 +48,6 @@ typedef struct {
     apr_array_header_t *proxy_ips;
     const char         *orig_scheme;
     const char         *https_scheme;
-    int                orig_port;
     int                forbid_if_not_proxy;
     int                clean_headers;
 } rpaf_server_cfg;
@@ -75,7 +74,6 @@ static void *rpaf_create_server_cfg(apr_pool_t *p, server_rec *s) {
     #endif
 
     cfg->https_scheme = apr_pstrdup(p, "https");
-    cfg->orig_port = s->port;
 
     return (void *)cfg;
 }
@@ -430,7 +428,6 @@ static int rpaf_post_read_request(request_rec *r) {
         } else {
             r->parsed_uri.port     = atoi(portvalue);
             r->parsed_uri.port_str = apr_pstrcat(r->pool, ":", portvalue, NULL);
-
         }
     }
 
