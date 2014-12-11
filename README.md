@@ -13,6 +13,10 @@ It has a different name, as we require the original libapache2-mod-rpaf on Magen
 ```bash
 sudo apt-get build-dep libapache2-mod-rpaf
 dpkg-buildpackage -rfakeroot -uc -b
+scp ../*.{changes,deb} root@debian1.c1:/srv/debian/repository/incoming
+ssh root@debian1.c1 /srv/debian/repository/process-naar-wheezy-main.sh
+
+
 ```
 
 # Original README follows
