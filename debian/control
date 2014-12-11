@@ -1,12 +1,10 @@
 Source: libapache2-mod-rpaf-gnif
-Maintainer: Sergey B Kirpichev <skirpichev@gmail.com>
+Maintainer: Willem de Groot <willem@byte.nl>
 Section: httpd
 Priority: extra
 Standards-Version: 3.9.3
 Build-Depends: apache2-threaded-dev, debhelper (>= 9)
-#Vcs-Git: git://git.debian.org/git/collab-maint/libapache2-mod-rpaf.git
-#Vcs-Browser: http://git.debian.org/?p=collab-maint/libapache2-mod-rpaf.git;a=summary
-Homepage: http://stderr.net/apache/rpaf/
+Homepage: https://github.com/ByteInternet/libapache2-mod-rpaf-gnif
 DM-Upload-Allowed: yes
 
 Package: libapache2-mod-rpaf-gnif

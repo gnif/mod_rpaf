@@ -1,3 +1,9 @@
+libapache2-mod-rpaf-gnif (20141211.2) unstable; urgency=low
+
+  * Put rpaf.conf in apache2/conf.d instead of mods-available
+
+ -- Willem de Groot <willem@byte.nl>  Thu, 11 Dec 2014 10:00:43 -0200
+
 libapache2-mod-rpaf-gnif (20141211.1) unstable; urgency=low
 
   * Initial release 
