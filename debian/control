@@ -1,15 +1,27 @@
 Source: libapache2-mod-rpaf-gnif
-Section: unknown
+Maintainer: Sergey B Kirpichev <skirpichev@gmail.com>
+Section: httpd
 Priority: extra
-Maintainer: Willem de Groot <willem@byte.nl>
-Build-Depends: debhelper (>= 8.0.0)
 Standards-Version: 3.9.3
-Homepage: <insert the upstream URL, if relevant>
-#Vcs-Git: git://git.debian.org/collab-maint/libapache2-mod-rpaf-gnif.git
-#Vcs-Browser: http://git.debian.org/?p=collab-maint/libapache2-mod-rpaf-gnif.git;a=summary
+Build-Depends: apache2-threaded-dev, debhelper (>= 9)
+#Vcs-Git: git://git.debian.org/git/collab-maint/libapache2-mod-rpaf.git
+#Vcs-Browser: http://git.debian.org/?p=collab-maint/libapache2-mod-rpaf.git;a=summary
+Homepage: http://stderr.net/apache/rpaf/
+DM-Upload-Allowed: yes
 
 Package: libapache2-mod-rpaf-gnif
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
-Description: <insert up to 60 chars description>
- <insert long description, indented with spaces>
+Depends: apache2 | apache2-mpm, ${shlibs:Depends}, ${misc:Depends}
+Description: module for Apache2 which takes the last IP from the 'X-Forwarded-For' header
+ rpaf is short for reverse proxy add forward.
+ .
+ rpaf is for backend Apache servers what mod_proxy_add_forward is for
+ frontend Apache servers. It does exactly the opposite of
+ mod_proxy_add_forward written by Ask Bjorn Hansen.
+ .
+ It changes the remote address of the client visible to other Apache modules
+ when two conditions are satisfied. First condition is that the remote client
+ is actually a proxy that is defined in httpd.conf. Secondly if there is an
+ incoming X-Forwarded-For header and the proxy is in its list of known
+ proxies it takes the last IP from the incoming X-Forwarded-For header and
+ changes the remote address of the client in the request structure.

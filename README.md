@@ -1,3 +1,22 @@
+# Byte README
+
+This is the Byte fork for https://github.com/gnif/mod_rpaf with debian build files.
+
+We need it because the mod_rpaf in Wheezy is too old and doesn't fix %{HTTPS} in mod_rewrite rules.
+
+After wheezy, supposedly, it is not required anymore as it is covered by mod_forwardip (untested though). 
+
+It has a different name, as we require the original libapache2-mod-rpaf on Magento app servers and want to use the same repository.
+
+## Building
+
+```bash
+sudo apt-get build-dep libapache2-mod-rpaf
+dpkg-buildpackage -rfakeroot -uc -b
+```
+
+# Original README follows
+
 ## mod_rpaf - reverse proxy add forward
 
 ### Summary
