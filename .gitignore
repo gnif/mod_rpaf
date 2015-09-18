@@ -1,0 +1,6 @@
+*.log
+debian/libapache2-mod-rpaf-gnif/
+.libs/
+*.la
+*.lo
+*.slo

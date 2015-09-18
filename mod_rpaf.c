@@ -48,8 +48,8 @@ typedef struct {
     apr_array_header_t *proxy_ips;
     const char         *orig_scheme;
     const char         *https_scheme;
-    int                orig_port;
     int                forbid_if_not_proxy;
+    int                clean_headers;
 } rpaf_server_cfg;
 
 typedef struct {
@@ -66,6 +66,7 @@ static void *rpaf_create_server_cfg(apr_pool_t *p, server_rec *s) {
     cfg->enable = 0;
     cfg->sethostname = 0;
     cfg->forbid_if_not_proxy = 0;
+    cfg->clean_headers = 0;
 
     /* server_rec->server_scheme only available after 2.2.3 */
     #if AP_SERVER_MINORVERSION_NUMBER > 1 && AP_SERVER_PATCHLEVEL_NUMBER > 2
@@ -73,7 +74,6 @@ static void *rpaf_create_server_cfg(apr_pool_t *p, server_rec *s) {
     #endif
 
     cfg->https_scheme = apr_pstrdup(p, "https");
-    cfg->orig_port = s->port;
 
     return (void *)cfg;
 }
@@ -160,6 +160,15 @@ static const char *rpaf_set_forbid_if_not_proxy(cmd_parms *cmd, void *dummy, int
                                                                    &rpaf_module);
 
     cfg->forbid_if_not_proxy = flag;
+    return NULL;
+}
+
+static const char *rpaf_set_clean_headers(cmd_parms *cmd, void *dummy, int flag) {
+    server_rec *s = cmd->server;
+    rpaf_server_cfg *cfg = (rpaf_server_cfg *)ap_get_module_config(s->module_config,
+                                                                   &rpaf_module);
+
+    cfg->clean_headers = flag;
     return NULL;
 }
 
@@ -251,6 +260,7 @@ static int rpaf_post_read_request(request_rec *r) {
     int i;
     apr_port_t tmpport;
     apr_pool_t *tmppool;
+    const char *header_ip = NULL, *header_host = NULL, *header_https = NULL, *header_port = NULL;
     rpaf_server_cfg *cfg = (rpaf_server_cfg *)ap_get_module_config(r->server->module_config,
                                                                    &rpaf_module);
 
@@ -274,22 +284,24 @@ static int rpaf_post_read_request(request_rec *r) {
         return DECLINED;
     }
 
-    /* check if cfg->headername is set and if it is use
-       that instead of X-Forwarded-For by default */
-    if (cfg->headername && (fwdvalue = (char *)apr_table_get(r->headers_in, cfg->headername))) {
-        //
-    } else if (cfg->headername == NULL && (fwdvalue = (char *)apr_table_get(r->headers_in, "X-Forwarded-For"))) {
-        //
-    } else {
-        return DECLINED;
+    /* TODO: We should not just assume that we should fallback to
+       X-Forwarded-For as this could pose a security risk, keeping
+       this for now to keep our behaviour consistant */
+    header_ip = cfg->headername;
+    if (header_ip)
+      fwdvalue = (char *)apr_table_get(r->headers_in, header_ip);
+    if (!header_ip || !fwdvalue)
+    {
+      header_ip = "X-Forwarded-For";
+      fwdvalue  = (char *)apr_table_get(r->headers_in, header_ip);
     }
 
     /* if there was no forwarded for header then we dont do anything */
     if (!fwdvalue)
         return DECLINED;
 
+    /* split up the list of forwarded IPs */
     apr_array_header_t *arr = apr_array_make(r->pool, 4, sizeof(char *));
-
     while ((val = strsep(&fwdvalue, ",")) != NULL) {
         /* strip leading and trailing whitespace */
         while(isspace(*val))
@@ -300,11 +312,26 @@ static int rpaf_post_read_request(request_rec *r) {
             *(char **)apr_array_push(arr) = apr_pstrdup(r->pool, val);
     }
 
-    if (arr->nelts == 0)
+    /* if there were no IPs, then there is nothing to do */
+    if (apr_is_empty_array(arr))
         return DECLINED;
 
+    /* get the last IP and check if it is in our list of proxies */
     if ((last_val = last_not_in_array(r, arr, cfg->proxy_ips)) == NULL)
         return DECLINED;
+
+    /* if we are cleaning up the headers then we need to correct the forwarded IP list */
+    if (cfg->clean_headers)
+    {
+        /* pop the proxy's IP from the list */
+        apr_array_pop(arr);
+        if (apr_is_empty_array(arr))
+            apr_table_unset(r->headers_in, header_ip);
+        else {
+            char *ip_list = apr_array_pstrcat(r->pool, arr, ',');
+            apr_table_set(r->headers_in, header_ip, ip_list);
+        }
+    }
 
     rpaf_cleanup_rec *rcr = (rpaf_cleanup_rec *)apr_pcalloc(r->pool, sizeof(rpaf_cleanup_rec));
     rcr->old_ip = apr_pstrdup(r->DEF_POOL, r->DEF_IP);
@@ -320,8 +347,16 @@ static int rpaf_post_read_request(request_rec *r) {
         memcpy(r->DEF_ADDR, tmpsa, sizeof(apr_sockaddr_t));
     if (cfg->sethostname) {
         const char *hostvalue;
-        if ((hostvalue = apr_table_get(r->headers_in, "X-Forwarded-Host")) ||
-            (hostvalue = apr_table_get(r->headers_in, "X-Host"))) {
+        header_host = "X-Forwarded-Host";
+        hostvalue   = apr_table_get(r->headers_in, header_host);
+        if (!hostvalue) {
+            header_host = "X-Host";
+            hostvalue   = apr_table_get(r->headers_in, header_host);
+        }
+
+        if (!hostvalue) {
+            header_host = NULL;
+        } else {
             apr_array_header_t *arr = apr_array_make(r->pool, 0, sizeof(char*));
             while (*hostvalue && (val = ap_get_token(r->pool, &hostvalue, 1))) {
                 *(char **)apr_array_push(arr) = apr_pstrdup(r->pool, val);
@@ -337,20 +372,34 @@ static int rpaf_post_read_request(request_rec *r) {
 
     if (cfg->sethttps) {
         const char *httpsvalue, *scheme;
-        if ((httpsvalue = apr_table_get(r->headers_in, "X-Forwarded-HTTPS")) ||
-            (httpsvalue = apr_table_get(r->headers_in, "X-HTTPS"))) {
+        header_https = "X-Forwarded-HTTPS";
+        httpsvalue   = apr_table_get(r->headers_in, header_https);
+        if (!httpsvalue) {
+            header_https = "X-HTTPS";
+            httpsvalue   = apr_table_get(r->headers_in, header_https);
+        }        
+
+        if (!httpsvalue) {
+            header_https = "X-Forwarded-Proto";
+            httpsvalue   = apr_table_get(r->headers_in, header_https);
+            if (httpsvalue) {
+                if (strcmp(httpsvalue, cfg->https_scheme) == 0) {
+                    apr_table_set(r->connection->notes, "rpaf_https", "on");
+                    apr_table_set(r->subprocess_env   , "HTTPS"     , "on");
+                    scheme = cfg->https_scheme;
+                } else {
+                    scheme = cfg->orig_scheme;
+                }
+            } else {
+                header_https = NULL;
+                scheme       = cfg->orig_scheme;
+            }
+        } else {
             apr_table_set(r->connection->notes, "rpaf_https", httpsvalue);
             apr_table_set(r->subprocess_env   , "HTTPS"     , httpsvalue);
-
             scheme = cfg->https_scheme;
-        } else if ((httpsvalue = apr_table_get(r->headers_in, "X-Forwarded-Proto"))
-                   && (strcmp(httpsvalue, cfg->https_scheme) == 0)) {
-            apr_table_set(r->connection->notes, "rpaf_https", "on");
-            apr_table_set(r->subprocess_env   , "HTTPS"     , "on");
-            scheme = cfg->https_scheme;
-        } else {
-            scheme = cfg->orig_scheme;
         }
+
         #if AP_SERVER_MINORVERSION_NUMBER > 1 && AP_SERVER_PATCHLEVEL_NUMBER > 2
         r->server->server_scheme = scheme;
         #endif
@@ -358,13 +407,27 @@ static int rpaf_post_read_request(request_rec *r) {
 
      if (cfg->setport) {
         const char *portvalue;
-        if ((portvalue = apr_table_get(r->headers_in, "X-Forwarded-Port")) ||
-            (portvalue = apr_table_get(r->headers_in, "X-Port"))) {
-            r->server->port    = atoi(portvalue);
-            r->parsed_uri.port = r->server->port;
-        } else {
-            r->server->port = cfg->orig_port;
+        header_port = "X-Forwarded-Port";
+        portvalue   = apr_table_get(r->headers_in, header_port);
+        if (!portvalue) {
+            header_port = "X-Port";
+            portvalue   = apr_table_get(r->headers_in, header_port);
         }
+
+        if (!portvalue) {
+            header_port            = NULL;
+            r->parsed_uri.port     = 0;
+            r->parsed_uri.port_str = NULL;
+        } else {
+            r->parsed_uri.port     = atoi(portvalue);
+            r->parsed_uri.port_str = apr_pstrcat(r->pool, ":", portvalue, NULL);
+        }
+    }
+
+    if (cfg->clean_headers) {
+        if (header_host ) apr_table_unset(r->headers_in, header_host );
+        if (header_https) apr_table_unset(r->headers_in, header_https);
+        if (header_port ) apr_table_unset(r->headers_in, header_port );
     }
 
     return DECLINED;
@@ -405,6 +468,13 @@ static const command_rec rpaf_cmds[] = {
                  NULL,
                  RSRC_CONF,
                  "Deny access if connection not from trusted RPAF_ProxyIPs"
+                 ),
+    AP_INIT_FLAG(
+                 "RPAF_CleanHeaders",
+                 rpaf_set_clean_headers,
+                 NULL,
+                 RSRC_CONF,
+                 "Remove forwarded headers from the request"
                  ),
     AP_INIT_ITERATE(
                  "RPAF_ProxyIPs",

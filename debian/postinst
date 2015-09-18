@@ -1,0 +1,17 @@
+#!/bin/sh
+
+set -e
+
+if [ "$1" = configure ] ; then
+# only enable on new installs, not on upgrades
+    if [ -z "$2" ] ; then
+	a2enmod -q rpaf
+    fi
+# 2015-09-18 - hansr - this interferes with service restart as done by our provisioning software
+# org: only restart if mod_rpaf is enabled
+#    if [ -e /etc/apache2/mods-enabled/rpaf.load ] ; then
+#	invoke-rc.d apache2 restart
+#    fi
+fi
+
+#DEBHELPER#

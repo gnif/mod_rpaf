@@ -1,0 +1,14 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@
+
+override_dh_auto_clean:
+	rm -rf .libs *.la *.lo
+
+override_dh_auto_build:
+	apxs2 -S CFLAGS="$(CFLAGS) -D_LARGEFILE64_SOURCE $(CPPFLAGS)" -c -o mod_rpaf.so mod_rpaf.c
+
+override_dh_auto_test:
+
+override_dh_auto_install:

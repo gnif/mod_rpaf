@@ -1,3 +1,26 @@
+# Byte README
+
+This is the Byte fork for https://github.com/gnif/mod_rpaf with debian build files.
+
+We need it because the mod_rpaf in Wheezy is too old and doesn't fix %{HTTPS} in mod_rewrite rules.
+
+After wheezy, supposedly, it is not required anymore as it is covered by mod_forwardip (untested though). 
+
+It has a different name, as we require the original libapache2-mod-rpaf on Magento app servers and want to use the same repository.
+
+## Building
+
+```bash
+sudo apt-get build-dep libapache2-mod-rpaf
+dpkg-buildpackage -rfakeroot -uc -b
+scp ../*.{changes,deb} root@debian1.c1:/srv/debian/repository/incoming
+ssh root@debian1.c1 /srv/debian/repository/process-naar-wheezy-main.sh
+
+
+```
+
+# Original README follows
+
 ## mod_rpaf - reverse proxy add forward
 
 ### Summary
@@ -40,6 +63,10 @@ Sets `remoteip-proxy-ip-list` field in r->notes table to list of proxy intermedi
     RPAF_SetPort            (On|Off)                - Set the server port to the header
                                                       value contained in X-Port, or
                                                       X-Forwarded-Port. (See Issue #12)
+
+    RPAF_CleanHeaders       (On|Off)                - Cleanup the headers added/altered by
+                                                      the reverse proxy to hide it from the
+                                                      client application.
 
     RPAF_ForbidIfNotProxy   (On|Off)                - Option to forbid request if not from
                                                       trusted RPAF_ProxyIPs; otherwise

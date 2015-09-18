@@ -1,0 +1,25 @@
+Source: libapache2-mod-rpaf-gnif
+Maintainer: Willem de Groot <willem@byte.nl>
+Section: httpd
+Priority: extra
+Standards-Version: 3.9.3
+Build-Depends: apache2-threaded-dev, debhelper (>= 9)
+Homepage: https://github.com/ByteInternet/libapache2-mod-rpaf-gnif
+DM-Upload-Allowed: yes
+
+Package: libapache2-mod-rpaf-gnif
+Architecture: any
+Depends: apache2 | apache2-mpm, ${shlibs:Depends}, ${misc:Depends}
+Description: module for Apache2 which takes the last IP from the 'X-Forwarded-For' header
+ rpaf is short for reverse proxy add forward.
+ .
+ rpaf is for backend Apache servers what mod_proxy_add_forward is for
+ frontend Apache servers. It does exactly the opposite of
+ mod_proxy_add_forward written by Ask Bjorn Hansen.
+ .
+ It changes the remote address of the client visible to other Apache modules
+ when two conditions are satisfied. First condition is that the remote client
+ is actually a proxy that is defined in httpd.conf. Secondly if there is an
+ incoming X-Forwarded-For header and the proxy is in its list of known
+ proxies it takes the last IP from the incoming X-Forwarded-For header and
+ changes the remote address of the client in the request structure.

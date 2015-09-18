@@ -1,0 +1,8 @@
+libapache2-mod-rpaf for Debian
+------------------------------
+
+The mod_remoteip, available in the Apache 2.4 (not included in the
+Debian Wheezy) can be used for the same purpose:
+http://httpd.apache.org/docs/2.4/mod/mod_remoteip.html
+
+This module should be considered as deprecated after Wheezy+.
