@@ -22,7 +22,7 @@ Sets `remoteip-proxy-ip-list` field in r->notes table to list of proxy intermedi
 
     RPAF_Enable             (On|Off)                - Enable reverse proxy add forward
 
-    RPAF_ProxyIPs           127.0.0.1 10.0.0.0/24   - What IPs & bitmaksed subnets to adjust
+    RPAF_ProxyIPs           127.0.0.1 10.0.0.0/24   - What IPs & bitmasked subnets to adjust
                                                       requests for
 
     RPAF_Header             X-Forwarded-For         - The header to use for the real IP 
