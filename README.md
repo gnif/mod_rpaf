@@ -8,7 +8,7 @@ Sets `remoteip-proxy-ip-list` field in r->notes table to list of proxy intermedi
 
 ### Compile Debian/Ubuntu Package and Install
 
-    sudo apt-get install build-essential apache2-threaded-dev yada
+    sudo apt-get install build-essential apache2-threaded-dev
     make
     make install   
 
