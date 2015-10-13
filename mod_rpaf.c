@@ -81,7 +81,7 @@ static void *rpaf_create_server_cfg(apr_pool_t *p, server_rec *s) {
 /* quick check for ipv4/6 likelihood; similar to Apache2.4 mod_remoteip check */
 static int rpaf_looks_like_ip(const char *ip) {
     static const char ipv4_set[] = "0123456789./";
-    static const char ipv6_set[] = "0123456789abcdef:/";
+    static const char ipv6_set[] = "0123456789abcdef:/.";
 
     /* zero length value is not valid */
     if (!*ip)
