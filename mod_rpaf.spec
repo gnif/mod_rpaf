@@ -27,6 +27,7 @@ make rpaf
 rm -rf $RPM_BUILD_ROOT
 install -m0755 -d $RPM_BUILD_ROOT$(apxs -q LIBEXECDIR)
 make DESTDIR=$RPM_BUILD_ROOT install
+install -m0644 -D rpaf.conf $RPM_BUILD_ROOT/etc/httpd/conf.d/mod_rpaf.conf
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -45,7 +46,7 @@ rm -rf $RPM_BUILD_ROOT
 
 %changelog
 * Mon Nov 02 2015 Marc Teale <marc.teale@gmail.com> - 0.8
-- Remove reference to Debian build directory.
+- Update references to mod_rpaf.conf.
 
 * Mon Oct 17 2011 Ben Walton <bwalton@artsci.utoronto.ca> - 0.7
 - Initial spec file creation
