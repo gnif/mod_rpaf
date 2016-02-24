@@ -25,7 +25,7 @@ make rpaf
 
 %install
 rm -rf $RPM_BUILD_ROOT
-install -m0755 -d $RPM_BUILD_ROOT$(apxs -q LIBEXECDIR)
+install -m0755 -d $RPM_BUILD_ROOT$(/usr/sbin/apxs -q LIBEXECDIR)
 make DESTDIR=$RPM_BUILD_ROOT install
 install -m0644 -D rpaf.conf $RPM_BUILD_ROOT/etc/httpd/conf.d/mod_rpaf.conf
 
