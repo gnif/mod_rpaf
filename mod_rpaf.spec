@@ -38,6 +38,11 @@ rm -rf $RPM_BUILD_ROOT
 %config(noreplace) %{_sysconfdir}/httpd/conf.d/mod_rpaf.conf
 
 %changelog
+* Wed Feb 24 2016 Yohsuke Ooi <meke@momonga-linux.org> - 0.8.4
+- remove "Requre: httpd-devel"
+- remove post, preun section
+- add "dist" tag to Release
+
 * Mon Nov 02 2015 Marc Teale <marc.teale@gmail.com> - 0.8
 - Update references to mod_rpaf.conf.
 
