@@ -16,9 +16,9 @@
 
 #include "ap_release.h"
 #if AP_SERVER_MAJORVERSION_NUMBER >= 2 && AP_SERVER_MINORVERSION_NUMBER >= 4
-  #define DEF_IP   useragent_ip
-  #define DEF_ADDR useragent_addr
-  #define DEF_POOL pool
+  #define DEF_IP   connection->client_ip
+  #define DEF_ADDR connection->client_addr
+  #define DEF_POOL connection->pool
 #else
   #define DEF_IP   connection->remote_ip
   #define DEF_ADDR connection->remote_addr
