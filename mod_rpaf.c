@@ -252,13 +252,10 @@ static int rpaf_post_read_request(request_rec *r) {
     apr_port_t tmpport;
     apr_pool_t *tmppool;
     
-    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_WARNING, 0, r, "rpaf_post_read_request BEGIN");
-    
     rpaf_server_cfg *cfg = (rpaf_server_cfg *)ap_get_module_config(r->server->module_config, &rpaf_module);
 
     if (!cfg->enable)
         return DECLINED;
-    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_WARNING, 0, r, "TRACE #1");
 
     /* this overcomes an issue when mod_rewrite causes this to get called again
        and the environment value is lost for HTTPS. This is the only thing that
@@ -268,8 +265,7 @@ static int rpaf_post_read_request(request_rec *r) {
     if (rpaf_https) {
         apr_table_set(r->subprocess_env, "HTTPS", rpaf_https);
         return DECLINED;
-    }
-    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_WARNING, 0, r, "TRACE #2");
+    };
 
     /* check if the remote_addr is in the allowed proxy IP list */
     if (is_in_array(r->DEF_ADDR, cfg->proxy_ips) != 1) {
@@ -277,34 +273,20 @@ static int rpaf_post_read_request(request_rec *r) {
             return HTTP_FORBIDDEN;
         return DECLINED;
     }
-    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_WARNING, 0, r, "TRACE #3");
-    
-	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_WARNING, 0, r, "r->DEF_ADDR = %s", r->DEF_ADDR);
-    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_WARNING, 0, r, "r->DEF_IP = %s", r->DEF_IP);
-    
 
     /* check if cfg->headername is set and if it is use
        that instead of X-Forwarded-For by default */
     if (cfg->headername && (fwdvalue = (char *)apr_table_get(r->headers_in, cfg->headername))) {
         //
-    	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_WARNING, 0, r, "TRACE #3 BIS : case #1");
     } else if (cfg->headername == NULL && (fwdvalue = (char *)apr_table_get(r->headers_in, "X-Forwarded-For"))) {
         //
-    	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_WARNING, 0, r, "TRACE #3 BIS : case #2");
     } else {
-    	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_WARNING, 0, r, "TRACE #3 BIS : case DECLINED");
-    	//// HERE
     	fwdvalue = r->DEF_IP;
-        ////return DECLINED;
     }
-    
-	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_WARNING, 0, r, "fwdvalue = %s", fwdvalue);
-    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_WARNING, 0, r, "TRACE #4");
 
     /* if there was no forwarded for header then we dont do anything */
     if (!fwdvalue)
         return DECLINED;
-    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_WARNING, 0, r, "TRACE #5");
 
     apr_array_header_t *arr = apr_array_make(r->pool, 4, sizeof(char *));
 
@@ -317,22 +299,18 @@ static int rpaf_post_read_request(request_rec *r) {
         if (rpaf_looks_like_ip(val))
             *(char **)apr_array_push(arr) = apr_pstrdup(r->pool, val);
     }
-    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_WARNING, 0, r, "TRACE #6");
 
     if (arr->nelts == 0)
         return DECLINED;
-    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_WARNING, 0, r, "TRACE #7");
 
     if ((last_val = last_not_in_array(r, arr, cfg->proxy_ips)) == NULL)
         return DECLINED;
-    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_WARNING, 0, r, "TRACE #8");
 
     rpaf_cleanup_rec *rcr = (rpaf_cleanup_rec *)apr_pcalloc(r->pool, sizeof(rpaf_cleanup_rec));
     rcr->old_ip = apr_pstrdup(r->DEF_POOL, r->DEF_IP);
     rcr->r = r;
     apr_pool_cleanup_register(r->pool, (void *)rcr, rpaf_cleanup, apr_pool_cleanup_null);
     r->DEF_IP = apr_pstrdup(r->DEF_POOL, last_val);
-    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_WARNING, 0, r, "TRACE #9");
 
     tmppool = r->DEF_ADDR->pool;
     tmpport = r->DEF_ADDR->port;
@@ -356,7 +334,6 @@ static int rpaf_post_read_request(request_rec *r) {
             ap_update_vhost_from_headers(r);
         }
     }
-    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_WARNING, 0, r, "TRACE #10");
 
     if (cfg->sethttps) {
         const char *httpsvalue, *scheme;
@@ -378,7 +355,6 @@ static int rpaf_post_read_request(request_rec *r) {
         r->server->server_scheme = scheme;
         #endif
     }
-    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_WARNING, 0, r, "TRACE #11");
 
      if (cfg->setport) {
         const char *portvalue;
@@ -388,12 +364,10 @@ static int rpaf_post_read_request(request_rec *r) {
             r->server->port    = atoi(portvalue);
             r->parsed_uri.port = r->server->port;
         } else {
-        	ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_WARNING, 0, r, "cfg->orig_port = %s", cfg->orig_port);
             r->server->port = cfg->orig_port;
         }
     }
     
-    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_WARNING, 0, r, "rpaf_post_read_request END");
     
     return DECLINED;
 }
