@@ -360,15 +360,13 @@ static int rpaf_post_read_request(request_rec *r) {
         const char *portvalue;
         if ((portvalue = apr_table_get(r->headers_in, "X-Forwarded-Port")) ||
             (portvalue = apr_table_get(r->headers_in, "X-Port"))) {
-        	//// HERE
             r->server->port    = atoi(portvalue);
             r->parsed_uri.port = r->server->port;
         } else {
             r->server->port = cfg->orig_port;
         }
     }
-    
-    
+
     return DECLINED;
 }
 
