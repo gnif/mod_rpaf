@@ -251,8 +251,8 @@ static int rpaf_post_read_request(request_rec *r) {
     int i;
     apr_port_t tmpport;
     apr_pool_t *tmppool;
-    
-    rpaf_server_cfg *cfg = (rpaf_server_cfg *)ap_get_module_config(r->server->module_config, &rpaf_module);
+    rpaf_server_cfg *cfg = (rpaf_server_cfg *)ap_get_module_config(r->server->module_config,  
+                                                                   &rpaf_module);
 
     if (!cfg->enable)
         return DECLINED;
@@ -265,7 +265,7 @@ static int rpaf_post_read_request(request_rec *r) {
     if (rpaf_https) {
         apr_table_set(r->subprocess_env, "HTTPS", rpaf_https);
         return DECLINED;
-    };
+    }
 
     /* check if the remote_addr is in the allowed proxy IP list */
     if (is_in_array(r->DEF_ADDR, cfg->proxy_ips) != 1) {
