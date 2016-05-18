@@ -251,7 +251,7 @@ static int rpaf_post_read_request(request_rec *r) {
     int i;
     apr_port_t tmpport;
     apr_pool_t *tmppool;
-    rpaf_server_cfg *cfg = (rpaf_server_cfg *)ap_get_module_config(r->server->module_config,  
+    rpaf_server_cfg *cfg = (rpaf_server_cfg *)ap_get_module_config(r->server->module_config,
                                                                    &rpaf_module);
 
     if (!cfg->enable)
