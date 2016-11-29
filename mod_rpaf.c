@@ -281,7 +281,7 @@ static int rpaf_post_read_request(request_rec *r) {
     } else if (cfg->headername == NULL && (fwdvalue = (char *)apr_table_get(r->headers_in, "X-Forwarded-For"))) {
         //
     } else {
-        return DECLINED;
+    	fwdvalue = r->DEF_IP;
     }
 
     /* if there was no forwarded for header then we dont do anything */
