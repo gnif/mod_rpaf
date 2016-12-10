@@ -54,6 +54,7 @@ typedef struct {
 
 typedef struct {
     const char  *old_ip;
+    apr_sockaddr_t old_addr;
     request_rec *r;
 } rpaf_cleanup_rec;
 
@@ -206,7 +207,7 @@ static int is_in_array(apr_sockaddr_t *remote_addr, apr_array_header_t *proxy_ip
 static apr_status_t rpaf_cleanup(void *data) {
     rpaf_cleanup_rec *rcr = (rpaf_cleanup_rec *)data;
     rcr->r->DEF_IP = apr_pstrdup(rcr->r->connection->pool, rcr->old_ip);
-    rcr->r->DEF_ADDR->sa.sin.sin_addr.s_addr = apr_inet_addr(rcr->r->DEF_IP);
+    memcpy(rcr->r->DEF_ADDR, &rcr->old_addr, sizeof(apr_sockaddr_t));
     return APR_SUCCESS;
 }
 
@@ -311,6 +312,7 @@ static int rpaf_post_read_request(request_rec *r) {
     rcr->r = r;
     apr_pool_cleanup_register(r->pool, (void *)rcr, rpaf_cleanup, apr_pool_cleanup_null);
     r->DEF_IP = apr_pstrdup(r->DEF_POOL, last_val);
+    memcpy(&rcr->old_addr, r->DEF_ADDR, sizeof(apr_sockaddr_t));
 
     tmppool = r->DEF_ADDR->pool;
     tmpport = r->DEF_ADDR->port;
