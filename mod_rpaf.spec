@@ -8,7 +8,7 @@ URL: https://github.com/gnif/mod_rpaf
 Source0: %{name}-%{version}.tar.gz
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
 BuildRequires: httpd-devel
-Requires: httpd httpd-devel
+Requires: httpd
 
 %description
 rpaf is for backend Apache servers what mod_proxy_add_forward is for
