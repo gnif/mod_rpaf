@@ -114,7 +114,7 @@ static const char *rpaf_set_proxy_ip(cmd_parms *cmd, void *dummy, const char *pr
 
     if (rpaf_looks_like_ip(proxy_ip)) {
         ip = apr_pstrdup(cmd->temp_pool, proxy_ip);
-        if (mask = ap_strchr(ip, '/')) {
+        if ((mask = ap_strchr(ip, '/'))) {
             *mask++ = '\0';
         }
         sub = (apr_ipsubnet_t **)apr_array_push(cfg->proxy_ips);
